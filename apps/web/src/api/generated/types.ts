@@ -13,6 +13,15 @@ export interface Artifactrecord {
   is_recommended?: boolean;
 }
 
+export interface Auditentry {
+  id: string;
+  actor: string;
+  action: string;
+  target: string;
+  detail: string;
+  ts: string;
+}
+
 export interface BodyPreviewApiDatasetsPreviewPost {
   upload: string;
 }
@@ -36,6 +45,22 @@ export interface BodySplitApiDatasetsSplitPost {
 
 export interface BodySynthApiDatasetsSynthPost {
   upload: string;
+}
+
+export interface Createprojectrequest {
+  name: string;
+  scene_id?: string | null;
+  mode?: Uimode;
+}
+
+export interface Createscenerequest {
+  template_id?: string | null;
+  name?: string | null;
+  summary?: string;
+  fields?: unknown[];
+  labels?: unknown[];
+  jev_format_compat?: boolean;
+  jev_training_compat?: boolean;
 }
 
 export type Decision = "black" | "white" | "gray";
@@ -78,6 +103,16 @@ export interface Evaluationresponse {
   effect: Record<string, unknown>;
   top_factors: unknown[];
   notes: unknown[];
+}
+
+export interface Fieldspec {
+  name: string;
+  label: string;
+  kind?: string;
+  required?: boolean;
+  sensitive?: boolean;
+  constraint_min?: number | null;
+  constraint_max?: number | null;
 }
 
 export interface Healthresponse {
@@ -189,6 +224,16 @@ export interface Previewresponse {
   preview_limit?: number;
 }
 
+export interface Project {
+  id: string;
+  code: string;
+  name: string;
+  mode: Uimode;
+  scene_code: string | null;
+  created_at: string;
+  note?: string;
+}
+
 export interface Qualityresponse {
   score: number;
   grade: string;
@@ -202,6 +247,41 @@ export interface Qualityresponse {
 export type Quantlevel = "Q4_K_M" | "Q5_K_M" | "Q8_0";
 
 export type Runstate = "pending" | "running" | "paused" | "succeeded" | "failed" | "cancelled";
+
+export interface Scenesummary {
+  id: string;
+  code: string;
+  name: string;
+  summary: string;
+  field_count: number;
+  labels: unknown[];
+  recommended_base_model: string;
+  recommended_methods: unknown[];
+  core_metrics: unknown[];
+  jev_format_compat: boolean;
+  jev_training_compat: boolean;
+  /** template | custom */
+  source: string;
+}
+
+export interface Scenetemplate {
+  id: string;
+  name: string;
+  summary: string;
+  recommended?: boolean;
+  field_count: number;
+  labels: unknown[];
+  recommended_base_model: string;
+  recommended_methods: unknown[];
+  core_metrics: unknown[];
+  example_dataset?: string | null;
+}
+
+export interface Servicestatus {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
 
 export interface Splitresponse {
   train_rows: number;
@@ -235,6 +315,18 @@ export interface Synthresponse {
   reversible_risk: string;
   all_rows_marked_synthetic: boolean;
 }
+
+export interface Systemstatus {
+  gpu_available: boolean;
+  gpu_detail: string;
+  services: unknown[];
+  persistence: string;
+  model_count: number;
+  in_scope_model_count: number;
+  notes: unknown[];
+}
+
+export type Uimode = "wizard" | "canvas" | "rapid" | "expert";
 
 export interface Validationerror {
   loc: unknown[];

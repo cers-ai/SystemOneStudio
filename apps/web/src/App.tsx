@@ -1,79 +1,72 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { HealthPanel } from '@/features/system/HealthPanel';
-import { StepRail } from '@/features/wizard/StepRail';
-import { StepBody } from '@/features/wizard/StepBody';
-import { useWizard } from '@/features/wizard/useWizard';
+import { HomeView } from '@/views/HomeView';
+import { ProjectsView } from '@/views/ProjectsView';
+import { ScenesView } from '@/views/ScenesView';
+import { SystemView } from '@/views/SystemView';
+import { WizardView } from '@/views/WizardView';
+import { currentPath, navigate, routeTitle, ROUTES, type RoutePath } from '@/app/routes';
 import './styles/global.css';
-
-type UiMode = 'wizard' | 'rapid';
-
-const MODE_COPY: Record<UiMode, { label: string; blurb: string }> = {
-  wizard: {
-    label: '向导模式',
-    blurb: '七步流程，每步一屏，可随时跳过使用推荐值',
-  },
-  rapid: {
-    label: '极速模式',
-    blurb: '只需完成前两步，其余由系统自动采用推荐值',
-  },
-};
+import './styles/app-shell.css';
 
 export function App() {
-  const wizard = useWizard();
-  const [mode, setMode] = useState<UiMode>(wizard.state.mode);
-  const [showStatus, setShowStatus] = useState(false);
+  const [path, setPath] = useState<RoutePath>(() => currentPath());
 
-  const copy = MODE_COPY[mode];
-  const current = wizard.state.current;
+  useEffect(() => {
+    const onChange = (): void => setPath(currentPath());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+
+  // A bare path (#/ or #) should land on the home view rather than a blank
+  // shell, since that is where a first-time visitor is expected to start.
+  useEffect(() => {
+    if (path === '' && window.location.hash !== '#/') navigate('');
+  }, [path]);
 
   return (
-    <div className="app">
-      <header className="app__header">
-        <div className="app__brand">
+    <div className="shell">
+      <aside className="shell__nav">
+        <div className="shell__brand">
           <strong>SystemOneStudio</strong>
           <span>决策模型训练平台</span>
         </div>
 
-        <div className="segmented" role="group" aria-label="流程模式">
-          {(Object.keys(MODE_COPY) as UiMode[]).map((key) => (
+        <nav className="shell__links" aria-label="主导航">
+          {ROUTES.map((route) => (
             <button
-              key={key}
+              key={route.path}
               type="button"
-              className="segmented__btn"
-              aria-pressed={mode === key}
-              onClick={() => {
-                setMode(key);
-                wizard.setMode(key);
-              }}
+              className="shell__link"
+              aria-current={path === route.path ? 'page' : undefined}
+              onClick={() => navigate(route.path)}
             >
-              {MODE_COPY[key].label}
+              <span className="shell__link-icon" aria-hidden="true">
+                {route.icon}
+              </span>
+              {route.label}
             </button>
           ))}
+        </nav>
+
+        <div className="shell__nav-foot">
+          <p className="shell__nav-note">
+            极速模式下只需完成前两步，其余由系统自动采用推荐值。
+          </p>
         </div>
+      </aside>
 
-        <span className="app__header-spacer" />
-
-        <button
-          type="button"
-          className="btn btn--ghost"
-          aria-expanded={showStatus}
-          onClick={() => setShowStatus((v) => !v)}
-        >
-          平台状态
-        </button>
-      </header>
-
-      {showStatus ? (
-        <div style={{ padding: '16px 24px 0' }}>
-          <HealthPanel />
+      <div className="shell__content">
+        <header className="shell__header">
+          <h1 className="shell__title">{routeTitle(path)}</h1>
+        </header>
+        <div className="shell__view">
+          {path === '' ? <HomeView onNavigate={navigate} /> : null}
+          {path === 'projects' ? <ProjectsView /> : null}
+          {path === 'scenes' ? <ScenesView /> : null}
+          {path === 'wizard' ? <WizardView /> : null}
+          {path === 'system' ? <SystemView /> : null}
         </div>
-      ) : null}
-
-      <div className="app__main">
-        <StepRail wizard={wizard} onNavigate={wizard.goTo} />
-
-        <StepBody wizard={wizard} onModeHint={copy.blurb} current={current} />
       </div>
     </div>
   );

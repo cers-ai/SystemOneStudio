@@ -93,4 +93,9 @@ EXPOSE 9969
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://127.0.0.1:9969/health || exit 1
 
-CMD ["uvicorn", "son_api.main:app", "--host", "0.0.0.0", "--port", "9969", "--workers", "2"]
+# Single worker on purpose. The project and scene store is in-process memory
+# (see apps/api/src/son_api/routers/platform.py), and each uvicorn worker gets
+# its own copy -- with --workers 2 a record written through one worker is
+# invisible to the other, producing "I created it but it is not there".
+# Raise this only once the ORM models land.
+CMD ["uvicorn", "son_api.main:app", "--host", "0.0.0.0", "--port", "9969", "--workers", "1"]

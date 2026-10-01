@@ -506,6 +506,284 @@
         }
       }
     },
+    "/api/scenes/templates": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "场景模板列表",
+        "description": "The gallery source (需求方案.txt 5.1: 六个预置模板).",
+        "operationId": "list_templates_api_scenes_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SceneTemplate"
+                  },
+                  "type": "array",
+                  "title": "Response List Templates Api Scenes Templates Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenes": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "已创建场景",
+        "operationId": "list_scenes_api_scenes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SceneSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Scenes Api Scenes Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "从模板或从零创建场景",
+        "description": "Instantiate a template, or build a scene from scratch.\n\nCreating from scratch requires a name; instantiating a template inherits its\nrecommended model, methods and metrics.",
+        "operationId": "create_scene_api_scenes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSceneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenes/{scene_id}/jev": {
+      "patch": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "更新 JEV 开关",
+        "description": "The two switches stay independent (需求方案.txt 6.3).",
+        "operationId": "update_jev_flags_api_scenes__scene_id__jev_patch",
+        "parameters": [
+          {
+            "name": "scene_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scene Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JevFlags"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "项目列表",
+        "operationId": "list_projects_api_projects_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  },
+                  "type": "array",
+                  "title": "Response List Projects Api Projects Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "新建项目",
+        "operationId": "create_project_api_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/status": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "平台运行状态",
+        "description": "What this deployment can actually do.\n\nReports the GPU rather than assuming one. The whole verification story\ndepends on whether a number came from a real device.",
+        "operationId": "system_status_api_system_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/audit": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "审计日志",
+        "description": "变更记录（需求方案.txt 原则 5 可审计）.",
+        "operationId": "audit_log_api_system_audit_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "title": "Response Audit Log Api System Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -639,6 +917,44 @@
         ],
         "title": "ArtifactRecord"
       },
+      "AuditEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "ts": {
+            "type": "string",
+            "title": "Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "action",
+          "target",
+          "detail",
+          "ts"
+        ],
+        "title": "AuditEntry"
+      },
       "Body_preview_api_datasets_preview_post": {
         "properties": {
           "upload": {
@@ -728,6 +1044,91 @@
           "upload"
         ],
         "title": "Body_synth_api_datasets_synth_post"
+      },
+      "CreateProjectRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "scene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/UiMode",
+            "default": "wizard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateProjectRequest"
+      },
+      "CreateSceneRequest": {
+        "properties": {
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpec"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "jev_format_compat": {
+            "type": "boolean",
+            "title": "Jev Format Compat",
+            "default": true
+          },
+          "jev_training_compat": {
+            "type": "boolean",
+            "title": "Jev Training Compat",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "CreateSceneRequest"
       },
       "Decision": {
         "type": "string",
@@ -962,6 +1363,63 @@
           "notes"
         ],
         "title": "EvaluationResponse"
+      },
+      "FieldSpec": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "pattern": "^(numeric|categorical|text|datetime)$",
+            "title": "Kind",
+            "default": "numeric"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive",
+            "default": false
+          },
+          "constraint_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraint Min"
+          },
+          "constraint_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraint Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label"
+        ],
+        "title": "FieldSpec",
+        "description": "One field in a scene's schema."
       },
       "HTTPValidationError": {
         "properties": {
@@ -1438,6 +1896,55 @@
         ],
         "title": "PreviewResponse"
       },
+      "Project": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/UiMode"
+          },
+          "scene_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Code"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "mode",
+          "scene_code",
+          "created_at"
+        ],
+        "title": "Project"
+      },
       "QualityResponse": {
         "properties": {
           "score": {
@@ -1519,6 +2026,181 @@
         ],
         "title": "RunState",
         "description": "Lifecycle for every long-running job.\n\nThe orchestrator state machine and every `status` column are generated from\nthis enum so the two cannot drift apart."
+      },
+      "SceneSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "field_count": {
+            "type": "integer",
+            "title": "Field Count"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "recommended_base_model": {
+            "type": "string",
+            "title": "Recommended Base Model"
+          },
+          "recommended_methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Methods"
+          },
+          "core_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Core Metrics"
+          },
+          "jev_format_compat": {
+            "type": "boolean",
+            "title": "Jev Format Compat"
+          },
+          "jev_training_compat": {
+            "type": "boolean",
+            "title": "Jev Training Compat"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "template | custom"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "summary",
+          "field_count",
+          "labels",
+          "recommended_base_model",
+          "recommended_methods",
+          "core_metrics",
+          "jev_format_compat",
+          "jev_training_compat",
+          "source"
+        ],
+        "title": "SceneSummary"
+      },
+      "SceneTemplate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "recommended": {
+            "type": "boolean",
+            "title": "Recommended",
+            "default": false
+          },
+          "field_count": {
+            "type": "integer",
+            "title": "Field Count"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "recommended_base_model": {
+            "type": "string",
+            "title": "Recommended Base Model"
+          },
+          "recommended_methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Methods"
+          },
+          "core_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Core Metrics"
+          },
+          "example_dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example Dataset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "summary",
+          "field_count",
+          "labels",
+          "recommended_base_model",
+          "recommended_methods",
+          "core_metrics"
+        ],
+        "title": "SceneTemplate",
+        "description": "A predefined scene (需求方案.txt 5.1 card grid)."
+      },
+      "ServiceStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "ok",
+          "detail"
+        ],
+        "title": "ServiceStatus"
       },
       "SplitResponse": {
         "properties": {
@@ -1690,6 +2372,66 @@
           "all_rows_marked_synthetic"
         ],
         "title": "SynthResponse"
+      },
+      "SystemStatus": {
+        "properties": {
+          "gpu_available": {
+            "type": "boolean",
+            "title": "Gpu Available"
+          },
+          "gpu_detail": {
+            "type": "string",
+            "title": "Gpu Detail"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceStatus"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "persistence": {
+            "type": "string",
+            "title": "Persistence"
+          },
+          "model_count": {
+            "type": "integer",
+            "title": "Model Count"
+          },
+          "in_scope_model_count": {
+            "type": "integer",
+            "title": "In Scope Model Count"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gpu_available",
+          "gpu_detail",
+          "services",
+          "persistence",
+          "model_count",
+          "in_scope_model_count",
+          "notes"
+        ],
+        "title": "SystemStatus"
+      },
+      "UiMode": {
+        "type": "string",
+        "enum": [
+          "wizard",
+          "canvas",
+          "rapid",
+          "expert"
+        ],
+        "title": "UiMode",
+        "description": "Interaction modes. All four share one engine and one flow definition."
       },
       "ValidationError": {
         "properties": {
