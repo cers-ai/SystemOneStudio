@@ -143,6 +143,16 @@ class TestJevSwitchesAreIndependent:
         with pytest.raises(ValidationError):
             DEFAULT_JEV_FLAGS.jev_format_compat = False  # type: ignore[misc]
 
+    def test_both_off_is_truthy_as_an_object(self) -> None:
+        """A falsey model would make `flags or default` drop a deliberate
+        'both off' configuration on the floor."""
+        both_off = JevFlags(jev_format_compat=False, jev_training_compat=False)
+        assert bool(both_off) is True
+        assert both_off.any_enabled() is False
+
+    def test_any_enabled_reports_true_when_one_is_on(self) -> None:
+        assert JevFlags(jev_format_compat=False, jev_training_compat=True).any_enabled() is True
+
 
 class TestLineageCodes:
     def _valid(self) -> Lineage:

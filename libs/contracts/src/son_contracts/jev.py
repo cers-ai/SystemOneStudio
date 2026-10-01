@@ -110,8 +110,14 @@ class JevFlags(BaseModel):
     jev_format_compat: bool = True
     jev_training_compat: bool = True
 
-    def __bool__(self) -> bool:  # pragma: no cover - convenience only
-        return self.jev_format_compat and self.jev_training_compat
+    def any_enabled(self) -> bool:
+        """Whether any switch is on.
+
+        Deliberately a named method rather than ``__bool__``: a falsey
+        ``JevFlags`` would make ``flags or JevFlags()`` silently discard a
+        caller's deliberate "both off" configuration.
+        """
+        return self.jev_format_compat or self.jev_training_compat
 
 
 DEFAULT_JEV_FLAGS: Final = JevFlags()
