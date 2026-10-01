@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-synth"
+version = "0.1.0"
+description = "Synthetic data generation (SDV/CTGAN/TVAE) and privacy report."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "numpy>=1.26",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_synth"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

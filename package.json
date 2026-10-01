@@ -1,0 +1,23 @@
+{
+  "name": "systemone-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SystemOneStudio - zero-code decision model training platform",
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "dev:api": "uv run uvicorn son_api.main:app --reload --port 8000",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "verify": "npm run lint && npm run typecheck && npm run test",
+    "verify:py": "uv run ruff format --check . && uv run ruff check . && uv run mypy apps libs services && uv run pytest"
+  }
+}

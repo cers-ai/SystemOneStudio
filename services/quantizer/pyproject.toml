@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-quantizer"
+version = "0.1.0"
+description = "LoRA merge and GGUF quantization (Q4_K_M default)."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_quantizer"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-api"
+version = "0.1.0"
+description = "Control-plane FastAPI service (project, scene, dataset, model, training, deploy)."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy>=2.0",
+  "son-contracts",
+  "son-orchestrator",
+  "son-jev-adapter",
+  "son-evaluator",
+  "son-inference",
+  "son-model-registry",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_api"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }
+son-evaluator = { workspace = true }
+son-inference = { workspace = true }
+son-jev-adapter = { workspace = true }
+son-model-registry = { workspace = true }
+son-orchestrator = { workspace = true }

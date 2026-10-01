@@ -1,0 +1,46 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Node ---
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# --- 模型与数据产物（绝不进 Git）---
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+/models/
+/data/
+/artifacts/
+*.parquet
+*.arrow
+
+# --- 环境与密钥 ---
+.env
+.env.*
+!.env.example
+
+# --- 编辑器 / 系统 ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- 运行时 ---
+*.log
+/logs/
+/tmp/

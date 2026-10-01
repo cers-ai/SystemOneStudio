@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-contracts"
+version = "0.1.0"
+description = "Cross-service Pydantic contracts and generated OpenAPI. Single source of truth for inter-service types."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_contracts"]
+
+[tool.uv.sources]

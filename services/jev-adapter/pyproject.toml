@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-jev-adapter"
+version = "0.1.0"
+description = "JEV format / training / eval alignment (jev_format_compat, jev_training_compat)."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_jev"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

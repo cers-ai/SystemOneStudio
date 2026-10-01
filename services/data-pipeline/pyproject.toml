@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-data-pipeline"
+version = "0.1.0"
+description = "Data governance, quality scoring, masking and 7:1.5:1.5 splitting."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "pandas>=2.2",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_data_pipeline"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

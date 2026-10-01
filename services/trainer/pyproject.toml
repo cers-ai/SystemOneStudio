@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-trainer"
+version = "0.1.0"
+description = "SFT / LoRA / QLoRA / DPO training pipeline orchestration."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "son-contracts",
+  "son-model-registry",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_trainer"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }
+son-model-registry = { workspace = true }

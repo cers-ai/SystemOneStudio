@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-model-registry"
+version = "0.1.0"
+description = "Base model registry and BaseModelAdapter abstraction."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_model_registry"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

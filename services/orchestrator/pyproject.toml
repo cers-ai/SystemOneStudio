@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-orchestrator"
+version = "0.1.0"
+description = "7-step workflow state machine and task dispatch."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "redis>=5.0",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_orchestrator"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

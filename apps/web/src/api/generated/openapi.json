@@ -1,0 +1,294 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SystemOneStudio Control Plane",
+    "description": "Control plane for the zero-code decision model training platform. The prediction surface is served separately per deployment at /v1/predict.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta/jev-spec": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Jev Spec",
+        "operationId": "jev_spec_meta_jev_spec_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JevSpecResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meta/echo-prediction": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Validate a prediction payload against the JEV output schema",
+        "description": "Contract self-check for the frontend and integration tests.\n\nNot a real inference path: the actual /v1/predict lives in the\ninference service, mounted per deployment.",
+        "operationId": "echo_prediction_meta_echo_prediction_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Decision": {
+        "type": "string",
+        "enum": [
+          "black",
+          "white",
+          "gray"
+        ],
+        "title": "Decision",
+        "description": "Three-way judgement outcome.\n\nDeliberately NOT a boolean. The `gray` label is a first-class outcome that\nthreads through synthesis ratios, quality reports and per-label evaluation\nmetrics. Collapsing it into black/white silently drops the hardest cases."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "jev_spec_version": {
+            "type": "string",
+            "title": "Jev Spec Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service",
+          "jev_spec_version"
+        ],
+        "title": "HealthResponse"
+      },
+      "JevFlags": {
+        "properties": {
+          "jev_format_compat": {
+            "type": "boolean",
+            "title": "Jev Format Compat",
+            "default": true
+          },
+          "jev_training_compat": {
+            "type": "boolean",
+            "title": "Jev Training Compat",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "JevFlags",
+        "description": "The two JEV compatibility switches.\n\nThese are two independent switches by requirement, not one toggle. They\ncontrol different layers and must be allowed to differ:\n\n* ``jev_format_compat``   -> input/output schema, prompt format, API shape\n* ``jev_training_compat`` -> training paradigm, hyperparameters, eval basis\n\nBoth default to enabled. When ``jev_format_compat`` is off the API still\nreturns the same four fields so callers keep a single parser, but the\nresponse is explicitly flagged as non-JEV via ``PredictResponse``'s\n``jev_compatible`` field."
+      },
+      "JevSpecResponse": {
+        "properties": {
+          "spec_version": {
+            "type": "string",
+            "title": "Spec Version"
+          },
+          "output_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output Schema"
+          },
+          "default_flags": {
+            "$ref": "#/components/schemas/JevFlags"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spec_version",
+          "output_schema",
+          "default_flags",
+          "note"
+        ],
+        "title": "JevSpecResponse",
+        "description": "Machine-readable JEV contract served to the frontend.\n\nExposing the output schema lets apps/web generate the Playground result\nview and the format-compliance display from one source instead of\nduplicating the field list."
+      },
+      "PredictRequest": {
+        "properties": {
+          "model_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version Id",
+            "description": "Pin a specific model version; omit to use the active deployment."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "PredictRequest",
+        "description": "A single decision request.\n\nThe sample payload is schema-free: the field set is defined per scene, and\nthe platform must not reject a scene-specific field it has never seen. So\nunknown fields are allowed and passed through to the prompt template."
+      },
+      "PredictResponse": {
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/Decision",
+            "description": "判定结果: black / white / gray"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "description": "风险评分"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "置信度"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reason",
+            "description": "决策依据 (required; capped at 200 chars under JEV format compat)"
+          },
+          "jev_compatible": {
+            "type": "boolean",
+            "title": "Jev Compatible",
+            "description": "False when the scene runs with jev_format_compat disabled.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "score",
+          "confidence",
+          "reason"
+        ],
+        "title": "PredictResponse",
+        "description": "Decision output. Field set is identical whether or not JEV format\ncompatibility is on, so callers need only one parser.\n\n``jev_compatible`` tells the caller which contract they are actually\nholding. It is false when the scene runs with ``jev_format_compat``\ndisabled, in which case `reason` is no longer bound by the JEV schema."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
