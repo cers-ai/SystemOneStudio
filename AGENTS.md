@@ -51,13 +51,30 @@ apps/api              FastAPI 控制面
 libs/contracts        跨服务 Pydantic 契约 + JEV 常量（src/son_contracts）
 libs/model-registry   底座注册表 + BaseModelAdapter 抽象（src/son_model_registry）
 libs/ui-terminology   技术术语 → 业务文案映射表（TypeScript）
-services/*            引擎层：orchestrator / data-pipeline / synth / trainer /
-                      quantizer / evaluator / inference / jev-adapter
+services/data-pipeline  上传 / 脱敏 / 质量报告 / 7:1.5:1.5 划分 / 参数推荐
+services/synth          三种合成模式 + 保真度 + 隐私风险报告
+services/orchestrator   7 步流程状态机（M5）
+services/trainer        训练编排（M2，需 GPU）
+services/quantizer      合并与 GGUF 量化（M2，需 GPU）
+services/evaluator      评测（M3，受 Q1/Q3 阻塞）
+services/inference      llama.cpp 编排（M3，受 Q1 阻塞）
+services/jev-adapter    JEV 格式 / 训练 / 评测对齐（M5）
 tools/                codegen 脚本
 deploy/compose        本地依赖编排；deploy/gpu 放 GPU 节点（尚空）
 ```
 
-**Python 导入名不跟目录名一致**：`services/jev-adapter` → `son_jev`，`libs/model-registry` → `son_model_registry`。mypy 的 `mypy_path` 在根 `pyproject.toml` 里逐条列了 `src` 目录——**新增 Python 包时要同步加进去**，否则 mypy 解析不到。
+**Python 导入名不跟目录名一致**：`services/jev-adapter` → `son_jev`，`libs/model-registry` → `son_model_registry`，`services/data-pipeline` → `son_data_pipeline`。mypy 的 `mypy_path` 在根 `pyproject.toml` 里逐条列了 `src` 目录——**新增 Python 包时要同步加进去**，否则 mypy 解析不到。
+
+`libs/ui-terminology` 是 TypeScript 包，**不能**被根 `pyproject.toml` 的 `libs/*` 通配符匹配到；uv workspace 里 `libs/` 是逐条列出的。
+
+## 已落地的核心不变量（改动前先读源码）
+
+这几条都有测试守着，改动前先看 `services/data-pipeline/src/son_data_pipeline/split.py`：
+
+- **合成数据不进测试集**是**结构性**保证：test 从只含 seed 行的池子里抽，再断言一次兜底。全合成数据输入会被显式拒绝。`split.py` 里的 `test_split.py::test_guard_catches_a_leak_if_one_is_injected` 专门证明断言不是死代码。
+- **脱敏不可逆**：没有 unmask 路径。`text[-0:]` 是整个字符串不是空串，写脱敏规则时注意 `keep_suffix=0`。
+- **异常检测用修正 z-score 不是 IQR**：需求 5.3 的形状（离群占 31%）会让 q3 落进离群块，IQR 直接失效。
+- **合成器必带 label**：未指定 `augment_label` 时按种子分布采样，不会产出 `None` 标签。
 
 ## 环境事实（已实测，不要重新假设）
 
@@ -130,13 +147,15 @@ deploy/compose        本地依赖编排；deploy/gpu 放 GPU 节点（尚空）
 
 ## 开工顺序
 
-M0 已完成（骨架 + 工具链 + 契约层 + 术语映射）。下一步按 `开发计划.md`：
+M0、M1（后端）已完成。下一步按 `开发计划.md`：
 
-1. **M1** 数据链路——`services/data-pipeline` + `services/synth`
+1. ~~**M1** 数据链路——`services/data-pipeline` + `services/synth`~~ ✅ 后端与 API 已落地；向导页属 M4
 2. **M2** 训练链路 `[GPU]`——`services/trainer` + `services/quantizer`
 3. **M3** 推理与评测 `[GPU]`——`services/inference` + `services/evaluator`（**受 Q1/Q3 阻塞**）
-4. **M4** 前端七步向导
-5. **M5** 部署与 JEV API
+4. **M4** 前端七步向导（消费 M1 已就绪的 5 个数据集端点）
+5. **M5** 部署与 JEV API + 编排状态机
 6. **M6** 端到端验证 `[GPU]`
 
-`apps/api` 目前只有 `/health`、`/meta/jev-spec`、`/meta/echo-prediction` 三个契约面端点，功能端点随各自里程碑落地。
+**M2 是下一个关键路径起点，但需要 GPU。** 在无 GPU 机器上只能做代码级验证（适配器实现、流水线编排、断点续训逻辑），训练、量化、延迟数字一律标注未验证。
+
+已落地端点：`/health`、`/meta/jev-spec`、`/meta/echo-prediction`、`/api/datasets/{preview,quality,split,recommend-synth,synth}`。

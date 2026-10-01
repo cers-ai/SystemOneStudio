@@ -4,6 +4,26 @@
 // libs/contracts. Regenerate with:
 //   uv run python tools/gen_openapi_types.py
 
+export interface BodyPreviewApiDatasetsPreviewPost {
+  upload: string;
+}
+
+export interface BodyQualityApiDatasetsQualityPost {
+  upload: string;
+}
+
+export interface BodyRecommendSynthApiDatasetsRecommendSynthPost {
+  upload: string;
+}
+
+export interface BodySplitApiDatasetsSplitPost {
+  upload: string;
+}
+
+export interface BodySynthApiDatasetsSynthPost {
+  upload: string;
+}
+
 export type Decision = "black" | "white" | "gray";
 
 export interface Healthresponse {
@@ -44,6 +64,64 @@ export interface Predictresponse {
   reason: string;
   /** False when the scene runs with jev_format_compat disabled. */
   jev_compatible?: boolean;
+}
+
+export interface Previewresponse {
+  columns: unknown[];
+  rows: unknown[];
+  total_rows: number;
+  label_column: string | null;
+  label_confidence: string;
+  label_reason: string;
+  label_distribution: Record<string, unknown>;
+  sensitive_fields: Record<string, unknown>;
+  missing_cells: number;
+  missing_rate: number;
+  /** 需求方案.txt 5.2 shows the first 5 rows */
+  preview_limit?: number;
+}
+
+export interface Qualityresponse {
+  score: number;
+  grade: string;
+  dimensions: unknown[];
+  label_distribution: Record<string, unknown>;
+  anomalies: unknown[];
+  masked_fields: unknown[];
+  suggestions: unknown[];
+}
+
+export interface Splitresponse {
+  train_rows: number;
+  valid_rows: number;
+  test_rows: number;
+  test_contains_synth: boolean;
+  label_distribution: Record<string, unknown>;
+  undersized_groups: unknown[];
+}
+
+export type Synthmethod = "distribution_fit" | "small_sample_derive" | "rule_injection";
+
+export interface Synthrecommendationresponse {
+  method: string;
+  total_rows: number;
+  black_white_ratio: number;
+  augment_label: string | null;
+  augment_rows: number;
+  reasons: unknown[];
+  describe: string;
+}
+
+export interface Synthresponse {
+  method: string;
+  rows: number;
+  label_distribution: Record<string, unknown>;
+  fidelity_score: number;
+  fidelity_verdict: string;
+  fidelity_notes: unknown[];
+  privacy_lines: unknown[];
+  reversible_risk: string;
+  all_rows_marked_synthetic: boolean;
 }
 
 export interface Validationerror {

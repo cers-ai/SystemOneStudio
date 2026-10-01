@@ -6,6 +6,269 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/datasets/preview": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "上传并预览",
+        "description": "Step 2 of the wizard: upload, preview, auto-detect (需求方案.txt 5.2).",
+        "operationId": "preview_api_datasets_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_api_datasets_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/quality": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "数据质量报告",
+        "description": "Step 3 of the wizard: composite score plus one-click suggestions.",
+        "operationId": "quality_api_datasets_quality_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_quality_api_datasets_quality_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/split": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "数据划分 7:1.5:1.5",
+        "description": "Fixed 7:1.5:1.5 split.\n\nThe caller cannot pass in their own split. There is one implementation of\nthis rule and it is the one that enforces the no-synthetic-in-test\nconstraint.",
+        "operationId": "split_api_datasets_split_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_split_api_datasets_split_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/recommend-synth": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "合成参数推荐",
+        "description": "Step 4 of the wizard: pre-filled synthesis parameters (需求方案.txt 5.4).",
+        "operationId": "recommend_synth_api_datasets_recommend_synth_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_recommend_synth_api_datasets_recommend_synth_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynthRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/synth": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "智能数据合成",
+        "description": "Step 4 of the wizard: generate samples and report fidelity + privacy.",
+        "operationId": "synth_api_datasets_synth_post",
+        "parameters": [
+          {
+            "name": "method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SynthMethod",
+              "default": "distribution_fit"
+            }
+          },
+          {
+            "name": "target_rows",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "title": "Target Rows"
+            }
+          },
+          {
+            "name": "augment_label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Decision"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Augment Label"
+            }
+          },
+          {
+            "name": "target_ratio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Ratio"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_synth_api_datasets_synth_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -93,6 +356,76 @@
   },
   "components": {
     "schemas": {
+      "Body_preview_api_datasets_preview_post": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_preview_api_datasets_preview_post"
+      },
+      "Body_quality_api_datasets_quality_post": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_quality_api_datasets_quality_post"
+      },
+      "Body_recommend_synth_api_datasets_recommend_synth_post": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_recommend_synth_api_datasets_recommend_synth_post"
+      },
+      "Body_split_api_datasets_split_post": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_split_api_datasets_split_post"
+      },
+      "Body_synth_api_datasets_synth_post": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_synth_api_datasets_synth_post"
+      },
       "Decision": {
         "type": "string",
         "enum": [
@@ -248,6 +581,320 @@
         ],
         "title": "PredictResponse",
         "description": "Decision output. Field set is identical whether or not JEV format\ncompatibility is on, so callers need only one parser.\n\n``jev_compatible`` tells the caller which contract they are actually\nholding. It is false when the scene runs with ``jev_format_compat``\ndisabled, in which case `reason` is no longer bound by the JEV schema."
+      },
+      "PreviewResponse": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "label_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Column"
+          },
+          "label_confidence": {
+            "type": "string",
+            "title": "Label Confidence"
+          },
+          "label_reason": {
+            "type": "string",
+            "title": "Label Reason"
+          },
+          "label_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Label Distribution"
+          },
+          "sensitive_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sensitive Fields"
+          },
+          "missing_cells": {
+            "type": "integer",
+            "title": "Missing Cells"
+          },
+          "missing_rate": {
+            "type": "number",
+            "title": "Missing Rate"
+          },
+          "preview_limit": {
+            "type": "integer",
+            "title": "Preview Limit",
+            "description": "需求方案.txt 5.2 shows the first 5 rows",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns",
+          "rows",
+          "total_rows",
+          "label_column",
+          "label_confidence",
+          "label_reason",
+          "label_distribution",
+          "sensitive_fields",
+          "missing_cells",
+          "missing_rate"
+        ],
+        "title": "PreviewResponse"
+      },
+      "QualityResponse": {
+        "properties": {
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade"
+          },
+          "dimensions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Dimensions"
+          },
+          "label_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Label Distribution"
+          },
+          "anomalies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Anomalies"
+          },
+          "masked_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Masked Fields"
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "grade",
+          "dimensions",
+          "label_distribution",
+          "anomalies",
+          "masked_fields",
+          "suggestions"
+        ],
+        "title": "QualityResponse"
+      },
+      "SplitResponse": {
+        "properties": {
+          "train_rows": {
+            "type": "integer",
+            "title": "Train Rows"
+          },
+          "valid_rows": {
+            "type": "integer",
+            "title": "Valid Rows"
+          },
+          "test_rows": {
+            "type": "integer",
+            "title": "Test Rows"
+          },
+          "test_contains_synth": {
+            "type": "boolean",
+            "title": "Test Contains Synth"
+          },
+          "label_distribution": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Label Distribution"
+          },
+          "undersized_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Undersized Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "train_rows",
+          "valid_rows",
+          "test_rows",
+          "test_contains_synth",
+          "label_distribution",
+          "undersized_groups"
+        ],
+        "title": "SplitResponse"
+      },
+      "SynthMethod": {
+        "type": "string",
+        "enum": [
+          "distribution_fit",
+          "small_sample_derive",
+          "rule_injection"
+        ],
+        "title": "SynthMethod"
+      },
+      "SynthRecommendationResponse": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "black_white_ratio": {
+            "type": "number",
+            "title": "Black White Ratio"
+          },
+          "augment_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Augment Label"
+          },
+          "augment_rows": {
+            "type": "integer",
+            "title": "Augment Rows"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "describe": {
+            "type": "string",
+            "title": "Describe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "total_rows",
+          "black_white_ratio",
+          "augment_label",
+          "augment_rows",
+          "reasons",
+          "describe"
+        ],
+        "title": "SynthRecommendationResponse"
+      },
+      "SynthResponse": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "label_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Label Distribution"
+          },
+          "fidelity_score": {
+            "type": "number",
+            "title": "Fidelity Score"
+          },
+          "fidelity_verdict": {
+            "type": "string",
+            "title": "Fidelity Verdict"
+          },
+          "fidelity_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fidelity Notes"
+          },
+          "privacy_lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Privacy Lines"
+          },
+          "reversible_risk": {
+            "type": "string",
+            "title": "Reversible Risk"
+          },
+          "all_rows_marked_synthetic": {
+            "type": "boolean",
+            "title": "All Rows Marked Synthetic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "rows",
+          "label_distribution",
+          "fidelity_score",
+          "fidelity_verdict",
+          "fidelity_notes",
+          "privacy_lines",
+          "reversible_risk",
+          "all_rows_marked_synthetic"
+        ],
+        "title": "SynthResponse"
       },
       "ValidationError": {
         "properties": {

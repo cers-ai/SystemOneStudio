@@ -79,7 +79,11 @@ class QualityReport(BaseModel):
     score: float = Field(ge=0.0, le=100.0, description="Composite quality score")
     sample_count: int = Field(ge=0)
     missing_rate: float = Field(ge=0.0, le=1.0)
-    black_white_ratio: float = Field(gt=0.0, description="black:white ratio, excludes gray")
+    black_white_ratio: float | None = Field(
+        default=None,
+        description="black:white ratio, excludes gray. None when not computable, "
+        "i.e. the dataset has no rows of one of the two classes.",
+    )
     label_distribution: dict[str, int] = Field(
         description="Row counts per label. Gray must be reported explicitly.",
     )
