@@ -12,12 +12,15 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace apps/web",
-    "dev:api": "uv run uvicorn son_api.main:app --reload --port 8000",
+    "dev:api": "uv run uvicorn son_api.main:app --reload --port 9969",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "verify": "npm run lint && npm run typecheck && npm run test",
-    "verify:py": "uv run ruff format --check . && uv run ruff check . && uv run mypy apps libs services && uv run pytest"
+    "verify:py": "uv run ruff format --check . && uv run ruff check . && uv run mypy apps libs services && uv run pytest",
+    "up": "docker compose -f deploy/compose/docker-compose.prod.yml up -d --build",
+    "down": "docker compose -f deploy/compose/docker-compose.prod.yml down",
+    "logs": "docker compose -f deploy/compose/docker-compose.prod.yml logs -f"
   }
 }

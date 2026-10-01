@@ -26,12 +26,13 @@ npm run verify:py          # = ruff format --check -> ruff check -> mypy -> pyte
 # 契约类型重新生成（改了 libs/contracts 或 apps/api 之后）
 uv run python tools/gen_openapi_types.py
 
-# 本地依赖服务（PostgreSQL / MinIO / Redis，不含 GPU 服务）
-docker compose -f deploy/compose/docker-compose.dev.yml up -d
+# 容器化部署（nginx + api + postgres + redis，不含 GPU 服务）
+npm run up          # docker compose -f deploy/compose/docker-compose.prod.yml up -d --build
+open http://127.0.0.1:9969
 
 # 开发服务器
-npm run dev:api            # uvicorn :8000
-npm run dev                # vite :5173，已配置 /api /meta /v1 /health 代理到 :8000
+npm run dev:api            # uvicorn :9969
+npm run dev                # vite :5174，已配置 /api /meta /v1 /health 代理到 :9969
 ```
 
 单点验证：

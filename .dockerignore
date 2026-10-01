@@ -1,0 +1,56 @@
+# Build context is the repo root (uv/npm workspaces), so most things that must
+# not enter the image have to be excluded explicitly.
+
+# --- Git ---
+.git/
+.gitignore
+.gitattributes
+
+# --- Secrets and local env ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Node ---
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# --- Model and data artifacts: must never enter an image layer ---
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+/parquet
+/arrow
+/models/
+/data/
+/artifacts/
+/.son-checkpoints/
+
+# --- Dockerfiles of siblings (only the one being built is needed) ---
+**/Dockerfile
+!apps/api/Dockerfile
+!apps/web/Dockerfile
+
+# --- Docs and tooling not needed at runtime ---
+需求方案.txt
+技术方案.md
+开发计划.md
+AGENTS.md
+.git/

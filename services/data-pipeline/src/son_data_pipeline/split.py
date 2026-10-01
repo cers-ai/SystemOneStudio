@@ -133,8 +133,14 @@ def stratified_split(
 
     test = _take_per_label(seed_pool, label_column, SPLIT_RATIOS["test"], reserve=1)
     if test.empty:
-        # Guarantees a non-empty evaluation set on small datasets.
-        test = seed_pool.head(max(1, round(len(seed_pool) * SPLIT_RATIOS["test"])))
+        # Too few rows to give every label even one test row (the 15% share of a
+        # handful of rows rounds to 0). Fall back to a label-balanced draw rather
+        # than `head()`: taking the first N rows after the shuffle hands the
+        # whole evaluation set to whichever label happens to sort first, which
+        # silently makes recall for the other labels uncomputable.
+        test = _take_balanced(
+            seed_pool, label_column, max(1, round(len(seed_pool) * SPLIT_RATIOS["test"]))
+        )
 
     # --- Everything left over, seed and synthetic alike, goes to train/valid.
     remainder = shuffled.drop(test.index)
@@ -184,6 +190,52 @@ def stratified_split(
         summary=summary,
         undersized_groups=undersized,
     )
+
+
+def _take_balanced(pool: pd.DataFrame, label_column: str, total: int) -> pd.DataFrame:
+    """Draw `total` rows spread across labels, largest-remainder allocation.
+
+    Used only when the dataset is too small for per-label rounding to give any
+    label a test row. Two properties matter:
+
+    * deterministic -- the largest class is served first, so the same dataset
+      yields the same evaluation set regardless of shuffle seed. The previous
+      implementation used ``head()``, which handed the evaluation set to
+      whichever label happened to sort first.
+    * never padded -- the fixed 7:1.5:1.5 ratios are a hard requirement, so a
+      dataset whose test share rounds to zero gets a one-row test set rather
+      than an invented one. The coverage shortfall is reported instead, through
+      the per-label counts in the summary and the undersized-group list.
+    """
+    present = [d for d in Decision if (pool[label_column] == d.value).any()]
+    if not present:
+        return pool.head(total)
+
+    base = min(1, total // len(present))
+    allocation = {d.value: base for d in present}
+    remaining = total - base * len(present)
+
+    # Hand out the rest to whichever labels have the most rows available.
+    by_size = sorted(present, key=lambda d: -int((pool[label_column] == d.value).sum()))
+    cursor = 0
+    while remaining > 0 and by_size:
+        label = by_size[cursor % len(by_size)].value
+        available = int((pool[label_column] == label).sum())
+        if allocation[label] < available:
+            allocation[label] += 1
+            remaining -= 1
+        elif all(
+            allocation[d.value] >= int((pool[label_column] == d.value).sum()) for d in present
+        ):
+            break
+        cursor += 1
+
+    parts = [
+        pool[pool[label_column] == label].iloc[:count]
+        for label, count in allocation.items()
+        if count > 0
+    ]
+    return pd.concat(parts) if parts else pool.head(total)
 
 
 def _concat(parts: list[pd.DataFrame], fallback: pd.DataFrame) -> pd.DataFrame:

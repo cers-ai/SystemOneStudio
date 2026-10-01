@@ -1,0 +1,121 @@
+name: systemone-studio
+
+# Containerized deployment.
+#
+#   npm run up        # docker compose ... up -d --build
+#   open http://127.0.0.1:9969
+#
+# Port 9969 is the single public entry point: nginx serves the SPA and proxies
+# /api, /meta, /health, /v1 and /docs to the control plane. Nothing else is
+# published to the host, so the database and queue are reachable only on the
+# internal network.
+#
+# NOT INCLUDED: training, GGUF quantization and llama.cpp inference. Those need an
+# NVIDIA GPU, which this machine does not have, and their images are multi-GB.
+# They ship from deploy/gpu/ on a GPU node. See AGENTS.md.
+
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: son-web:0.1.0
+    container_name: son-web
+    restart: unless-stopped
+    ports:
+      - '${SON_PUBLIC_PORT:-9969}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [sonnet]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: son-api:0.1.0
+    container_name: son-api
+    restart: unless-stopped
+    # Deliberately NOT published. Reach the API through nginx on 9969; exposing
+    # it too would create a second, unproxied path to the control plane.
+    expose:
+      - '9969'
+    environment:
+      SON_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-son}:${POSTGRES_PASSWORD:-son_local_only}@postgres:5432/${POSTGRES_DB:-sonstudio}
+      SON_REDIS_URL: redis://redis:6379/0
+      # Model artifacts: adapters, merged weights, GGUF. A volume rather than a
+      # database column or an object store -- see 技术方案.md 3.1.
+      SON_MODELS_DIR: /data/models
+    volumes:
+      - model-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [sonnet]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: son-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-son}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-son_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-sonstudio}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-son} -d ${POSTGRES_DB:-sonstudio}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [sonnet]
+
+  redis:
+    image: redis:7-alpine
+    container_name: son-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [sonnet]
+
+# Storage design, and why there is no object store here.
+#
+# 需求方案.txt 11 lists "MinIO + PostgreSQL" in the tech stack. That line is
+# overridden here, and the reasoning is recorded in 技术方案.md 3.1 and section 10:
+#
+#   - Nothing in the code reads it. There is no S3 client anywhere.
+#   - Sizing from the requirement's own numbers: seed data ~15,000x32 is a few
+#     MB and the 500,000-row synthetic set is ~150MB. Both fit PostgreSQL
+#     comfortably, and both are *relational* -- the split filters them by
+#     origin and label -- so a database is the right home, not blob storage.
+#   - The only genuinely large artifacts are model weights: merged bf16 for a 3B
+#     model is ~6GB, GGUF Q4_K_M ~2GB. Those are written once at the end of a
+#     training run and read once at deploy time. No streaming, no concurrent
+#     random writes, no sharing across many records. A database column would be
+#     worse than a file, and an object store would buy nothing.
+#   - The cost is not zero: a second container, health check, credential set,
+#     backup story and failure mode. 需求方案.txt 13 lists 范围膨胀 as a risk with
+#     "砍掉非核心功能" as the mitigation.
+#
+# Object storage returns in 阶段二, where the argument is real: multiple nodes and
+# the model marketplace both need artifacts shared across hosts.
+
+networks:
+  # Plain bridge, not `internal: true`: the API may need to pull base models
+  # later. The sandbox requirement in 需求方案.txt 13 applies to the
+  # training/synthesis workers, not to this control plane.
+  sonnet:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  model-data:
