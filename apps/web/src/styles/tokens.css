@@ -1,0 +1,110 @@
+/*
+ * Design tokens.
+ *
+ * Single source of truth for colour, spacing, type and motion. Components
+ * reference these, never raw hex values, so a theme change is one file.
+ *
+ * Density note: the audience is risk and compliance staff checking numbers, not
+ * browsing. Line height and control height are sized for reading Chinese text
+ * at 13-14px without fatigue, which is why the scale is tighter than a typical
+ * marketing-grade system.
+ */
+
+:root {
+  /* --- Neutrals ---------------------------------------------------------- */
+  /* Slightly warm, so long sessions on Chinese text feel less clinical. */
+  --c-bg: #f6f7f9;
+  --c-surface: #ffffff;
+  --c-surface-sunken: #f0f2f5;
+  --c-surface-raised: #ffffff;
+  --c-border: #e3e6ea;
+  --c-border-strong: #cdd2d9;
+
+  /* --- Text -------------------------------------------------------------- */
+  --c-text: #16191d;
+  --c-text-secondary: #545c66;
+  --c-text-tertiary: #868e99;
+  --c-text-inverse: #ffffff;
+
+  /* --- Accent ------------------------------------------------------------ */
+  /* One accent only. Status colours below carry all other meaning, so a
+     coloured element always means something and never just decoration. */
+  --c-accent: #2563eb;
+  --c-accent-hover: #1d4ed8;
+  --c-accent-active: #1e40af;
+  --c-accent-subtle: #eff4ff;
+  --c-accent-border: #c7d7fe;
+
+  /* --- Status ------------------------------------------------------------ */
+  --c-success: #15803d;
+  --c-success-subtle: #f0fdf4;
+  --c-success-border: #bbf7d0;
+  --c-warning: #b45309;
+  --c-warning-subtle: #fffbeb;
+  --c-warning-border: #fde68a;
+  --c-danger: #b91c1c;
+  --c-danger-subtle: #fef2f2;
+  --c-danger-border: #fecaca;
+  --c-info: #0e7490;
+  --c-info-subtle: #ecfeff;
+  --c-info-border: #a5f3fc;
+
+  /* --- Spacing ----------------------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* --- Radius ------------------------------------------------------------ */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+
+  /* --- Typography -------------------------------------------------------- */
+  /* PingFang SC and Microsoft YaHei are the Chinese UI faces on macOS and
+     Windows; Noto Sans CJK covers Linux. Latin falls through to the system
+     stack so numbers render in a proportional face. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+
+  --lh-tight: 1.3;
+  --lh-base: 1.6;
+
+  /* --- Elevation --------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
+  --shadow-md: 0 2px 8px rgb(16 24 40 / 8%);
+  --shadow-lg: 0 8px 24px rgb(16 24 40 / 12%);
+
+  /* --- Layout ------------------------------------------------------------ */
+  --header-h: 56px;
+  --rail-w: 232px;
+  --content-max: 980px;
+
+  /* --- Motion ------------------------------------------------------------ */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+
+  /* --- Focus ------------------------------------------------------------- */
+  /* Never remove the ring; only relocate it. Keyboard users are reviewing
+     financial decisions and need to see where they are. */
+  --ring: 0 0 0 3px rgb(37 99 235 / 25%);
+  --ring-danger: 0 0 0 3px rgb(185 28 28 / 25%);
+}
