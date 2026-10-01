@@ -9,7 +9,7 @@ generation source. Feature endpoints land per the milestone plan in
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from son_api.routers import datasets
+from son_api.routers import datasets, models
 from son_contracts import JEV_SPEC_VERSION, JevFlags
 from son_contracts.predict import JEV_OUTPUT_SCHEMA, PredictRequest, PredictResponse
 
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
         ),
     )
     app.include_router(datasets.router)
+    app.include_router(models.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     def health() -> HealthResponse:

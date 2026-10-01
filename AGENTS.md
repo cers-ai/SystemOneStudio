@@ -147,15 +147,25 @@ deploy/compose        本地依赖编排；deploy/gpu 放 GPU 节点（尚空）
 
 ## 开工顺序
 
-M0、M1（后端）已完成。下一步按 `开发计划.md`：
+M0–M5 的代码已全部落地并提交（460 Python + 94 TypeScript 测试全绿）。
 
-1. ~~**M1** 数据链路——`services/data-pipeline` + `services/synth`~~ ✅ 后端与 API 已落地；向导页属 M4
-2. **M2** 训练链路 `[GPU]`——`services/trainer` + `services/quantizer`
-3. **M3** 推理与评测 `[GPU]`——`services/inference` + `services/evaluator`（**受 Q1/Q3 阻塞**）
-4. **M4** 前端七步向导（消费 M1 已就绪的 5 个数据集端点）
-5. **M5** 部署与 JEV API + 编排状态机
-6. **M6** 端到端验证 `[GPU]`
+**尚未验证的环节——改动时不要假设它们已经跑通**：
 
-**M2 是下一个关键路径起点，但需要 GPU。** 在无 GPU 机器上只能做代码级验证（适配器实现、流水线编排、断点续训逻辑），训练、量化、延迟数字一律标注未验证。
+| 环节 | 状态 | 缺什么 |
+|---|---|---|
+| 训练 SFT/LoRA/QLoRA/DPO | 代码完成，未验证 | `TrainingBackend` 实现 + torch/PEFT/TRL + GPU |
+| 合并 LoRA + GGUF 量化 | 代码完成，未验证 | `LlamaCppTools` 实现 + llama.cpp + GPU |
+| llama.cpp 推理 / 延迟 / 内存 | 代码完成，未验证 | `InferenceEngine` 实现 + llama.cpp + GPU |
+| 效果指标（准确率/召回/误杀/F1/AUC） | **已本地验证** | — |
+| 性能指标聚合（分位数/TTFT/QPS 口径） | **已本地验证** | — |
+| JEV L2 / L3 兼容 | **不可声明** | Q3：官方规范与评测基准集不在仓库 |
+| 保真度 / 最近邻距离阈值 | 只报告不阻断 | Q2 |
 
-已落地端点：`/health`、`/meta/jev-spec`、`/meta/echo-prediction`、`/api/datasets/{preview,quality,split,recommend-synth,synth}`。
+**"代码完成但未验证"是什么意思**：这三个环节的实际执行走 `son_trainer.TrainingBackend`、`son_quantizer.LlamaCppTools`、`son_inference.InferenceEngine` 三个协议。未实现的路径**显式抛错并说明原因**，不返回伪造的成功结果。`/api/deployments` 返回 `status=pending` 加启动命令，不谎称服务已启动。写实现时保持这个约定。
+
+**下一步**：
+1. 在 GPU 节点实现三个 Backend，跑通 M2 → M3 → M6，拿到实测数字
+2. 落实 Q1（P95 口径）与 Q3（JEV 规范），这两项不定案，M3 性能验收与 L2/L3 无法完成
+3. 用真实反诈字段替换 Q4 占位模板
+
+已落地端点：`/health`、`/meta/jev-spec`、`/meta/echo-prediction`、`/api/datasets/{preview,quality,split,recommend-synth,synth}`、`/api/models`、`/api/models/{id}/adapter`、`/api/model-versions`、`/api/evaluations`、`/api/deployments`、`/api/jev/level-claim`。

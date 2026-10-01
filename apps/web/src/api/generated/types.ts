@@ -4,6 +4,15 @@
 // libs/contracts. Regenerate with:
 //   uv run python tools/gen_openapi_types.py
 
+export type Artifactformat = "gguf" | "native";
+
+export interface Artifactrecord {
+  format: Artifactformat;
+  quant?: Quantlevel | null;
+  size_bytes?: number | null;
+  is_recommended?: boolean;
+}
+
 export interface BodyPreviewApiDatasetsPreviewPost {
   upload: string;
 }
@@ -16,6 +25,11 @@ export interface BodyRecommendSynthApiDatasetsRecommendSynthPost {
   upload: string;
 }
 
+export interface BodyRegisterModelVersionApiModelVersionsPost {
+  lineage: Lineage;
+  artifacts: unknown[];
+}
+
 export interface BodySplitApiDatasetsSplitPost {
   upload: string;
 }
@@ -25,6 +39,46 @@ export interface BodySynthApiDatasetsSynthPost {
 }
 
 export type Decision = "black" | "white" | "gray";
+
+export interface Deployrequest {
+  model_version: string;
+  artifact_path: string;
+  quant_level?: Quantlevel;
+  port?: number;
+  concurrency?: number;
+  gpu_layers?: number;
+  jev_format_compat?: boolean;
+  jev_training_compat?: boolean;
+}
+
+export interface Deployresponse {
+  status: Runstate;
+  api_url: string;
+  docs_url: string;
+  curl: string;
+  launch_plan: unknown[];
+  jev_format_compat: boolean;
+  notes: unknown[];
+}
+
+export interface Evaluationrequest {
+  y_true: unknown[];
+  y_pred: unknown[];
+  scores?: unknown[] | null;
+  contributions?: Record<string, unknown>;
+  latency_samples?: unknown[];
+  quant_level?: Quantlevel;
+  concurrency?: number;
+  wall_clock_s?: number | null;
+  peak_memory_mb?: number | null;
+}
+
+export interface Evaluationresponse {
+  performance: Record<string, unknown>;
+  effect: Record<string, unknown>;
+  top_factors: unknown[];
+  notes: unknown[];
+}
 
 export interface Healthresponse {
   status: string;
@@ -36,9 +90,17 @@ export interface Httpvalidationerror {
   detail?: unknown[];
 }
 
+export type Jevcompatlevel = "L1" | "L2" | "L3";
+
 export interface Jevflags {
   jev_format_compat?: boolean;
   jev_training_compat?: boolean;
+}
+
+export interface Jevlevelclaimrequest {
+  model_id: string;
+  level: Jevcompatlevel;
+  evidence?: string | null;
 }
 
 export interface Jevspecresponse {
@@ -46,6 +108,52 @@ export interface Jevspecresponse {
   output_schema: Record<string, unknown>;
   default_flags: Jevflags;
   note: string;
+}
+
+export interface Latencysample {
+  total_ms: number;
+  ttft_ms?: number | null;
+}
+
+export interface Lineage {
+  /** Scene code, e.g. sc_v3 */
+  scene: string;
+  /** Dataset code, e.g. ds_v2 */
+  dataset: string;
+  /** Synthesis run code, e.g. syn_v5. None when synthesis was skipped. */
+  synth?: string | null;
+  /** Base model id, e.g. qwen2.5-3b-instruct */
+  base_model: string;
+  /** Training method id, e.g. jev_lora_dpo */
+  method: string;
+  /** Model version code, e.g. mv_0017 */
+  model_version: string;
+}
+
+export interface Modelcard {
+  model_id: string;
+  display_name: string;
+  family: string;
+  params: string;
+  min_gpu_memory: string;
+  jev_compat_level: Jevcompatlevel | null;
+  license: string;
+  in_mvp_scope: boolean;
+  adapter_type: string;
+}
+
+export interface Modelshelfresponse {
+  recommended: unknown[];
+  all: unknown[];
+  notes: unknown[];
+}
+
+export interface Modelversionresponse {
+  model_version: string;
+  lineage: Lineage;
+  artifacts: unknown[];
+  created_at: string;
+  notes: unknown[];
 }
 
 export interface Predictrequest {
@@ -90,6 +198,10 @@ export interface Qualityresponse {
   masked_fields: unknown[];
   suggestions: unknown[];
 }
+
+export type Quantlevel = "Q4_K_M" | "Q5_K_M" | "Q8_0";
+
+export type Runstate = "pending" | "running" | "paused" | "succeeded" | "failed" | "cancelled";
 
 export interface Splitresponse {
   train_rows: number;

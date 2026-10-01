@@ -269,6 +269,243 @@
         }
       }
     },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "底座模型货架",
+        "description": "Top-3 in-scope recommendations plus the full shelf.\n\nOut-of-scope entries are listed but flagged, so the shelf shows a 7B model as\nunavailable instead of pretending it does not exist. The MVP cap at 1.5B-3B\nis a deliberate answer to limited VRAM (需求方案.txt 13), not an omission.",
+        "operationId": "list_models_api_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelShelfResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{model_id}/adapter": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "适配器可用性",
+        "description": "Whether the adapter for a model is registered.\n\nNo adapter is registered yet: the real ones need torch/PEFT and a GPU. This\nreports that honestly instead of returning a placeholder.",
+        "operationId": "adapter_status_api_models__model_id__adapter_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Adapter Status Api Models  Model Id  Adapter Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/model-versions": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "注册模型版本",
+        "description": "Register a trained model version and its artifacts.\n\nLineage codes are validated by the ``Lineage`` model, so a malformed\n``sc_``/``ds_``/``mv_`` code is a 422 rather than a broken artifact later.",
+        "operationId": "register_model_version_api_model_versions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_register_model_version_api_model_versions_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluations": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "评测报告",
+        "description": "Compute the report, performance block first (需求方案.txt 9.1/9.2).\n\nThe two blocks are returned separately and never merged: the priority order\nis an architectural input, not a reporting preference.",
+        "operationId": "evaluate_api_evaluations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deployments": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "一键部署",
+        "description": "Produce the deployment plan and call example.\n\nReturns ``status=pending`` with the exact launch command rather than claiming\na service is running. Starting llama.cpp needs a GPU node and a llama.cpp\ncheckout; neither exists here, and reporting a running service from this\nprocess would be false (AGENTS.md).",
+        "operationId": "deploy_api_deployments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jev/level-claim": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "校验 JEV 兼容等级声明",
+        "description": "Validate a compatibility claim before it is written.\n\nL3 requires a comparison test; L2 requires the JEV benchmark, which is not in\nthis repository. Both are refused here rather than noted in a comment.",
+        "operationId": "claim_jev_level_api_jev_level_claim_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JevLevelClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Claim Jev Level Api Jev Level Claim Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -356,6 +593,52 @@
   },
   "components": {
     "schemas": {
+      "ArtifactFormat": {
+        "type": "string",
+        "enum": [
+          "gguf",
+          "native"
+        ],
+        "title": "ArtifactFormat"
+      },
+      "ArtifactRecord": {
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/ArtifactFormat"
+          },
+          "quant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuantLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "is_recommended": {
+            "type": "boolean",
+            "title": "Is Recommended",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "format"
+        ],
+        "title": "ArtifactRecord"
+      },
       "Body_preview_api_datasets_preview_post": {
         "properties": {
           "upload": {
@@ -398,6 +681,26 @@
         ],
         "title": "Body_recommend_synth_api_datasets_recommend_synth_post"
       },
+      "Body_register_model_version_api_model_versions_post": {
+        "properties": {
+          "lineage": {
+            "$ref": "#/components/schemas/Lineage"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRecord"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lineage",
+          "artifacts"
+        ],
+        "title": "Body_register_model_version_api_model_versions_post"
+      },
       "Body_split_api_datasets_split_post": {
         "properties": {
           "upload": {
@@ -436,6 +739,230 @@
         "title": "Decision",
         "description": "Three-way judgement outcome.\n\nDeliberately NOT a boolean. The `gray` label is a first-class outcome that\nthreads through synthesis ratios, quality reports and per-label evaluation\nmetrics. Collapsing it into black/white silently drops the hardest cases."
       },
+      "DeployRequest": {
+        "properties": {
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "artifact_path": {
+            "type": "string",
+            "title": "Artifact Path"
+          },
+          "quant_level": {
+            "$ref": "#/components/schemas/QuantLevel",
+            "default": "Q4_K_M"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port",
+            "default": 8080
+          },
+          "concurrency": {
+            "type": "integer",
+            "title": "Concurrency",
+            "default": 8
+          },
+          "gpu_layers": {
+            "type": "integer",
+            "title": "Gpu Layers",
+            "default": 0
+          },
+          "jev_format_compat": {
+            "type": "boolean",
+            "title": "Jev Format Compat",
+            "default": true
+          },
+          "jev_training_compat": {
+            "type": "boolean",
+            "title": "Jev Training Compat",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_version",
+          "artifact_path"
+        ],
+        "title": "DeployRequest"
+      },
+      "DeployResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "api_url": {
+            "type": "string",
+            "title": "Api Url"
+          },
+          "docs_url": {
+            "type": "string",
+            "title": "Docs Url"
+          },
+          "curl": {
+            "type": "string",
+            "title": "Curl"
+          },
+          "launch_plan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Launch Plan"
+          },
+          "jev_format_compat": {
+            "type": "boolean",
+            "title": "Jev Format Compat"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "api_url",
+          "docs_url",
+          "curl",
+          "launch_plan",
+          "jev_format_compat",
+          "notes"
+        ],
+        "title": "DeployResponse"
+      },
+      "EvaluationRequest": {
+        "properties": {
+          "y_true": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Y True"
+          },
+          "y_pred": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Y Pred"
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scores"
+          },
+          "contributions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Contributions"
+          },
+          "latency_samples": {
+            "items": {
+              "$ref": "#/components/schemas/LatencySample"
+            },
+            "type": "array",
+            "title": "Latency Samples"
+          },
+          "quant_level": {
+            "$ref": "#/components/schemas/QuantLevel",
+            "default": "Q4_K_M"
+          },
+          "concurrency": {
+            "type": "integer",
+            "title": "Concurrency",
+            "default": 1
+          },
+          "wall_clock_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wall Clock S"
+          },
+          "peak_memory_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Memory Mb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "y_true",
+          "y_pred"
+        ],
+        "title": "EvaluationRequest"
+      },
+      "EvaluationResponse": {
+        "properties": {
+          "performance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Performance"
+          },
+          "effect": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Effect"
+          },
+          "top_factors": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Top Factors"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "performance",
+          "effect",
+          "top_factors",
+          "notes"
+        ],
+        "title": "EvaluationResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -472,6 +999,16 @@
         ],
         "title": "HealthResponse"
       },
+      "JevCompatLevel": {
+        "type": "string",
+        "enum": [
+          "L1",
+          "L2",
+          "L3"
+        ],
+        "title": "JevCompatLevel",
+        "description": "JEV alignment levels.\n\nAssigned by measurement, never by hand. L3 in particular requires a\ncomparison test against native JEV output before it may be written."
+      },
       "JevFlags": {
         "properties": {
           "jev_format_compat": {
@@ -488,6 +1025,34 @@
         "type": "object",
         "title": "JevFlags",
         "description": "The two JEV compatibility switches.\n\nThese are two independent switches by requirement, not one toggle. They\ncontrol different layers and must be allowed to differ:\n\n* ``jev_format_compat``   -> input/output schema, prompt format, API shape\n* ``jev_training_compat`` -> training paradigm, hyperparameters, eval basis\n\nBoth default to enabled. When ``jev_format_compat`` is off the API still\nreturns the same four fields so callers keep a single parser, but the\nresponse is explicitly flagged as non-JEV via ``PredictResponse``'s\n``jev_compatible`` field."
+      },
+      "JevLevelClaimRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "level": {
+            "$ref": "#/components/schemas/JevCompatLevel"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "level"
+        ],
+        "title": "JevLevelClaimRequest"
       },
       "JevSpecResponse": {
         "properties": {
@@ -517,6 +1082,213 @@
         ],
         "title": "JevSpecResponse",
         "description": "Machine-readable JEV contract served to the frontend.\n\nExposing the output schema lets apps/web generate the Playground result\nview and the format-compliance display from one source instead of\nduplicating the field list."
+      },
+      "LatencySample": {
+        "properties": {
+          "total_ms": {
+            "type": "number",
+            "title": "Total Ms"
+          },
+          "ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttft Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_ms"
+        ],
+        "title": "LatencySample",
+        "description": "One measured request."
+      },
+      "Lineage": {
+        "properties": {
+          "scene": {
+            "type": "string",
+            "title": "Scene",
+            "description": "Scene code, e.g. sc_v3"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset",
+            "description": "Dataset code, e.g. ds_v2"
+          },
+          "synth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synth",
+            "description": "Synthesis run code, e.g. syn_v5. None when synthesis was skipped."
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model",
+            "description": "Base model id, e.g. qwen2.5-3b-instruct"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "description": "Training method id, e.g. jev_lora_dpo"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version",
+            "description": "Model version code, e.g. mv_0017"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scene",
+          "dataset",
+          "base_model",
+          "method",
+          "model_version"
+        ],
+        "title": "Lineage",
+        "description": "Immutable provenance snapshot attached to a model version.\n\nCodes follow the naming style in 需求方案.txt section 5.7.1, e.g.\n``sc_v3`` / ``ds_v2`` / ``syn_v5`` / ``mv_0017``."
+      },
+      "ModelCard": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "params": {
+            "type": "string",
+            "title": "Params"
+          },
+          "min_gpu_memory": {
+            "type": "string",
+            "title": "Min Gpu Memory"
+          },
+          "jev_compat_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JevCompatLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "in_mvp_scope": {
+            "type": "boolean",
+            "title": "In Mvp Scope"
+          },
+          "adapter_type": {
+            "type": "string",
+            "title": "Adapter Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "display_name",
+          "family",
+          "params",
+          "min_gpu_memory",
+          "jev_compat_level",
+          "license",
+          "in_mvp_scope",
+          "adapter_type"
+        ],
+        "title": "ModelCard",
+        "description": "One shelf entry, in the shape 5.5's mockup shows."
+      },
+      "ModelShelfResponse": {
+        "properties": {
+          "recommended": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCard"
+            },
+            "type": "array",
+            "title": "Recommended"
+          },
+          "all": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCard"
+            },
+            "type": "array",
+            "title": "All"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recommended",
+          "all",
+          "notes"
+        ],
+        "title": "ModelShelfResponse"
+      },
+      "ModelVersionResponse": {
+        "properties": {
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "lineage": {
+            "$ref": "#/components/schemas/Lineage"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRecord"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_version",
+          "lineage",
+          "artifacts",
+          "created_at",
+          "notes"
+        ],
+        "title": "ModelVersionResponse"
       },
       "PredictRequest": {
         "properties": {
@@ -724,6 +1496,29 @@
           "suggestions"
         ],
         "title": "QualityResponse"
+      },
+      "QuantLevel": {
+        "type": "string",
+        "enum": [
+          "Q4_K_M",
+          "Q5_K_M",
+          "Q8_0"
+        ],
+        "title": "QuantLevel",
+        "description": "GGUF quantization levels.\n\nQ4_K_M is the default because the JEV eval baseline is defined at Q4_K_M;\nperformance numbers are only comparable at equal quantization."
+      },
+      "RunState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "paused",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunState",
+        "description": "Lifecycle for every long-running job.\n\nThe orchestrator state machine and every `status` column are generated from\nthis enum so the two cannot drift apart."
       },
       "SplitResponse": {
         "properties": {
