@@ -37,8 +37,9 @@ class RecordingTools(LlamaCppTools):
         self.calls.append(("quantize", source, destination, level.value))
         Path(destination).write_bytes(b"gguf-placeholder")
 
-    def merge_lora(self, base: str, adapter: str, destination: str) -> None:
+    def merge_lora(self, base: str, adapter: str, destination: str) -> str:
         self.calls.append(("merge", base, adapter, destination))
+        return destination
 
 
 class UnavailableTools(RecordingTools):

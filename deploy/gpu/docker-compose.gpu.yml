@@ -1,0 +1,96 @@
+name: systemone-studio-gpu
+
+# GPU node stack: training, GGUF quantization, llama.cpp inference, evaluation.
+#
+#   docker compose -f deploy/gpu/docker-compose.gpu.yml up -d --build
+#   docker compose -f deploy/gpu/docker-compose.gpu.yml exec gpu python -m son_cli doctor
+#
+# This is the stack that produces real numbers. The default compose file has no
+# GPU services because the development machine has none.
+#
+# Requires the NVIDIA Container Toolkit on the host:
+#   nvidia-smi                      # driver visible
+#   docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+# If the second command fails, the toolkit is not installed and nothing here will
+# work -- `son_cli doctor` reports it as the first blocking item.
+#
+# VRAM note: 需求方案.txt 13 caps the MVP at 1.5B-3B with LoRA for VRAM reasons.
+# `--gpus all` grants every card; reduce to `--gpus '"device=0"'` to pin.
+
+services:
+  gpu:
+    build:
+      context: ../..
+      dockerfile: deploy/gpu/Dockerfile.gpu
+    image: son-gpu:0.1.0
+    container_name: son-gpu
+    restart: unless-stopped
+    gpus: all
+    shm_size: '8gb'    # DataLoader workers need more than the 64MB default
+    ports:
+      # Control plane API, mirroring the CPU stack's port so the same client and
+      # the same browser settings work against either.
+      - '${SON_API_PORT:-9969}:9969'
+      # llama-server, bound explicitly because a deploy chooses the port.
+      - '8080:8080'
+    environment:
+      SON_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-son}:${POSTGRES_PASSWORD:-son_local_only}@postgres:5432/${POSTGRES_DB:-sonstudio}
+      SON_REDIS_URL: redis://redis:6379/0
+      SON_MODELS_DIR: /data/models
+      SON_LLAMA_LOG: /data/logs/llama-server.log
+      HF_HOME: /data/hf-cache
+      # Consumed by the hyperparameter recommender; the shelf endpoint reads it
+      # too, so the VRAM estimate and the run agree.
+      SON_PARAMS_B: ${SON_PARAMS_B:-3.0}
+    volumes:
+      # Bind mounts, not named volumes: model weights and checkpoints need to
+      # survive a container rebuild, and you need to inspect them from the host.
+      - ${SON_DATA_DIR:-D:/SystemOneStudio-data}/models:/data/models
+      - ${SON_DATA_DIR:-D:/SystemOneStudio-data}/checkpoints:/data/checkpoints
+      - ${SON_DATA_DIR:-D:/SystemOneStudio-data}/hf-cache:/data/hf-cache
+      - ${SON_DATA_DIR:-D:/SystemOneStudio-data}/logs:/data/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [gpunet]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: son-gpu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-son}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-son_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-sonstudio}
+    volumes:
+      - gpu-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-son} -d ${POSTGRES_DB:-sonstudio}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [gpunet]
+
+  redis:
+    image: redis:7-alpine
+    container_name: son-gpu-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - gpu-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [gpunet]
+
+networks:
+  gpunet:
+    driver: bridge
+
+volumes:
+  gpu-postgres-data:
+  gpu-redis-data:

@@ -100,7 +100,12 @@ class LlamaCppTools(ABC):
     def quantize(self, source: str, destination: str, level: QuantLevel) -> None: ...
 
     @abstractmethod
-    def merge_lora(self, base: str, adapter: str, destination: str) -> None: ...
+    def merge_lora(self, base: str, adapter: str, destination: str) -> str:
+        """Fuse adapter weights into the base model.
+
+        Returns the path of the merged model, which is what the conversion step
+        consumes.
+        """
 
     def available(self) -> bool:
         return True
@@ -143,11 +148,12 @@ class SubprocessLlamaCppTools(LlamaCppTools):
             "llama-quantize",
         )
 
-    def merge_lora(self, base: str, adapter: str, destination: str) -> None:
+    def merge_lora(self, base: str, adapter: str, destination: str) -> str:
         raise ToolchainError(
             "合并 LoRA 权重需要目标底座的 PEFT 环境（torch/transformers/peft），"
             "属于 GPU 节点职责；本模块只编排外部命令，不在无 GPU 环境伪造结果"
         )
+        raise ToolchainError("unreachable")  # pragma: no cover
 
 
 def _run(argv: list[str], tool: str) -> None:

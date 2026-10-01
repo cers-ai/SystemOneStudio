@@ -12,6 +12,15 @@ dependencies = [
   "son-contracts",
 ]
 
+[project.optional-dependencies]
+# Needed only to merge LoRA weights into the base model. The GGUF conversion and
+# quantization steps shell out to llama.cpp binaries instead.
+merge = [
+  "torch>=2.4",
+  "transformers>=4.44",
+  "peft>=0.12",
+  "safetensors>=0.4",
+]
 [tool.hatch.build.targets.wheel]
 packages = ["src/son_quantizer"]
 

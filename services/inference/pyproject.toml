@@ -13,6 +13,9 @@ dependencies = [
   "son-contracts",
 ]
 
+[project.optional-dependencies]
+# Inference talks to a llama.cpp server over HTTP, so there is no Python
+# inference dependency. httpx is already a main dependency.
 [tool.hatch.build.targets.wheel]
 packages = ["src/son_inference"]
 

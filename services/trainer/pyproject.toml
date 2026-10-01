@@ -13,6 +13,20 @@ dependencies = [
   "son-model-registry",
 ]
 
+[project.optional-dependencies]
+# Training stack. Pinned loosely: exact versions depend on the CUDA version on
+# the target node, so the GPU image installs these at build time against that
+# node's toolkit rather than freezing them here.
+train = [
+  "torch>=2.4",
+  "transformers>=4.44",
+  "peft>=0.12",
+  "trl>=0.9",
+  "bitsandbytes>=0.43",
+  "accelerate>=0.33",
+  "datasets>=2.20",
+  "safetensors>=0.4",
+]
 [tool.hatch.build.targets.wheel]
 packages = ["src/son_trainer"]
 

@@ -1,0 +1,118 @@
+# syntax=docker/dockerfile:1
+# GPU training / quantization / inference node.
+#
+# Build context is the repo root: these packages are uv workspace members.
+#
+#   docker build -f deploy/gpu/Dockerfile.gpu -t son-gpu:0.1.0 .
+#
+# NOT built by the default compose file. The development machine has no NVIDIA
+# GPU and these images are multi-GB; this one is built on the node that has one.
+#
+# The CUDA runtime is pinned to 12.4 and the torch wheel index is set to match.
+# A mismatch there is the single most common cause of "CUDA out of memory" or
+# "no kernel image is available" on an otherwise correct setup, so the two
+# version strings below must stay in step.
+
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    # llama.cpp builds against these; the pinned tag is what the MVP targets.
+    LLAMA_CPP_VERSION=b4585 \
+    SON_MODELS_DIR=/data/models
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+        python3.11 \
+        python3.11-venv \
+        python3-pip \
+        git \
+        ca-certificates \
+        curl \
+        cmake \
+        build-essential \
+        libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv manages the workspace; a pinned Python avoids the system 3.10 that Ubuntu
+# ships, and keeps training on the same interpreter the control plane uses.
+COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /uvx /usr/local/bin/
+
+WORKDIR /src
+
+# llama.cpp provides convert_hf_to_gguf.py and llama-quantize. Built from source
+# against the CUDA runtime above rather than pulled as a prebuilt binary, because
+# the prebuilts are built for a different CUDA version.
+RUN git clone --depth 1 --branch ${LLAMA_CPP_VERSION} \
+        https://github.com/ggerganov/llama.cpp /opt/llama.cpp \
+    && cmake -S /opt/llama.cpp -B /opt/llama.cpp/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLLAMA_CUBLAS=ON \
+        -DGGML_CUDA=ON \
+        -DLLAMA_BUILD_TESTS=OFF \
+    && cmake --build /opt/llama.cpp/build --config Release -j "$(nproc)" \
+        --target llama-server llama-quantize llama-cli llama-merge-lora \
+    && install -m 0755 /opt/llama.cpp/build/bin/llama-server /usr/local/bin/ \
+    && install -m 0755 /opt/llama.cpp/build/bin/llama-quantize /usr/local/bin/ \
+    && install -m 0755 /opt/llama.cpp/build/bin/llama-cli /usr/local/bin/ \
+    && install -m 0755 /opt/llama.cpp/build/bin/llama-merge-lora /usr/local/bin/ \
+    && cp /opt/llama.cpp/convert_hf_to_gguf.py /usr/local/bin/
+
+# Dependency layer before source, so it caches.
+COPY pyproject.toml uv.lock ./
+COPY apps/api/pyproject.toml apps/api/pyproject.toml
+COPY libs/contracts/pyproject.toml libs/contracts/pyproject.toml
+COPY libs/model-registry/pyproject.toml libs/model-registry/pyproject.toml
+COPY services/orchestrator/pyproject.toml services/orchestrator/pyproject.toml
+COPY services/data-pipeline/pyproject.toml services/data-pipeline/pyproject.toml
+COPY services/synth/pyproject.toml services/synth/pyproject.toml
+COPY services/trainer/pyproject.toml services/trainer/pyproject.toml
+COPY services/quantizer/pyproject.toml services/quantizer/pyproject.toml
+COPY services/evaluator/pyproject.toml services/evaluator/pyproject.toml
+COPY services/inference/pyproject.toml services/inference/pyproject.toml
+COPY services/jev-adapter/pyproject.toml services/jev-adapter/pyproject.toml
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv venv --python 3.11 /opt/venv \
+    && uv pip install --python /opt/venv/bin/python \
+        --extra-index-url https://download.pytorch.org/whl/cu124 \
+        torch \
+    && uv pip install --python /opt/venv/bin/python \
+        transformers peft trl bitsandbytes accelerate datasets safetensors
+
+COPY libs/ libs/
+COPY services/ services/
+COPY apps/api/src/ apps/api/src/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+        son-contracts son-model-registry son-orchestrator son-data-pipeline \
+        son-synth son-trainer son-quantizer son-evaluator son-inference \
+        son-jev-adapter \
+    && uv pip install --python /opt/venv/bin/python \
+        fastapi uvicorn pydantic pydantic-settings sqlalchemy python-multipart httpx redis numpy pandas \
+    && /opt/venv/bin/python -c "import torch, transformers, peft, trl; print('training stack', torch.__version__, torch.cuda.is_available())"
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONPATH="/src/libs/contracts/src:/src/libs/model-registry/src:/src/services/orchestrator/src:/src/services/data-pipeline/src:/src/services/synth/src:/src/services/trainer/src:/src/services/quantizer/src:/src/services/evaluator/src:/src/services/inference/src:/src/services/jev-adapter/src:/src/apps/api/src"
+
+RUN useradd --system --uid 1001 --create-home --home-dir /home/son son \
+    && mkdir -p /data/models /data/checkpoints /data/logs \
+    && chown -R son:son /data
+
+USER son
+WORKDIR /src
+
+# Proves the stack imports AND reports the actual GPU, so a node without a
+# working CUDA setup fails at deploy time instead of halfway through a training
+# run.
+HEALTHCHECK --interval=60s --timeout=20s --start-period=30s --retries=3 \
+    CMD /opt/venv/bin/python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" \
+    || /opt/venv/bin/python -c "from son_inference.llamacpp_client import gpu_report; print(gpu_report())"
+
+CMD ["python", "-m", "son_cli", "serve"]
