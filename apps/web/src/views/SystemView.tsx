@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { platformApi, type SceneSummary } from '@/api/platform';
+import { AssistantSettingsCard } from '@/views/AssistantSettings';
 
 interface ModelCard {
   model_id: string;
@@ -39,6 +40,8 @@ export function SystemView() {
 
   return (
     <>
+      <AssistantSettingsCard />
+
       <section className="section">
         <div className="section__head">
           <h2 className="section__title">运行状态</h2>

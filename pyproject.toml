@@ -70,6 +70,7 @@ mypy_path = [
   "services/evaluator/src",
   "services/inference/src",
   "services/jev-adapter/src",
+  "services/assistant/src",
   "services/orchestrator/src",
   "services/quantizer/src",
   "services/synth/src",
@@ -120,6 +121,7 @@ testpaths = [
   "services/evaluator/tests",
   "services/inference/tests",
   "services/jev-adapter/tests",
+  "services/assistant/tests",
 ]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"

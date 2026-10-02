@@ -14,6 +14,7 @@ dependencies = [
   "pydantic-settings>=2.3",
   "python-multipart>=0.0.9",
   "sqlalchemy>=2.0",
+  "son-assistant",
   "son-contracts",
   "son-orchestrator",
   "son-jev-adapter",
@@ -26,6 +27,7 @@ dependencies = [
 packages = ["src/son_api"]
 
 [tool.uv.sources]
+son-assistant = { workspace = true }
 son-contracts = { workspace = true }
 son-evaluator = { workspace = true }
 son-inference = { workspace = true }

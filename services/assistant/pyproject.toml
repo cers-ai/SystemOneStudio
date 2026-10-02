@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-assistant"
+version = "0.1.0"
+description = "LLM-backed training assistant: platform guidance, diagnosis and parameter explanation."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "httpx>=0.27",
+  "son-contracts",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_assistant"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }

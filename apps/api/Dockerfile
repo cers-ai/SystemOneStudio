@@ -31,6 +31,7 @@ COPY services/quantizer/pyproject.toml services/quantizer/pyproject.toml
 COPY services/evaluator/pyproject.toml services/evaluator/pyproject.toml
 COPY services/inference/pyproject.toml services/inference/pyproject.toml
 COPY services/jev-adapter/pyproject.toml services/jev-adapter/pyproject.toml
+COPY services/assistant/pyproject.toml services/assistant/pyproject.toml
 
 # `--all-packages` is required: plain `uv sync` only installs the *root* project,
 # which here is a virtual workspace (package = false) holding just the dev tool

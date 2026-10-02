@@ -1,0 +1,189 @@
+/* Assistant panel: a docked side rail, not a floating widget.
+
+  Docked because it is consulted mid-task, while reading a report or looking at
+  an error. A floating bubble would cover the numbers the user is asking about. */
+
+.assistant {
+  position: sticky;
+  top: var(--header-h);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: calc(100vh - var(--header-h));
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.assistant__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-sunken);
+}
+
+.assistant__title { font-size: var(--fs-base); font-weight: 600; }
+
+.assistant__model {
+  font-size: var(--fs-xs);
+  color: var(--c-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.assistant__log {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 220px;
+}
+
+.assistant__empty {
+  padding: var(--sp-4) 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-secondary);
+}
+
+/* --- Bubbles ------------------------------------------------------------- */
+
+.bubble {
+  max-width: 92%;
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble--user {
+  align-self: flex-end;
+  background: var(--c-accent);
+  color: var(--c-text-inverse);
+  border-bottom-right-radius: 2px;
+}
+
+.bubble--assistant {
+  align-self: flex-start;
+  background: var(--c-surface-sunken);
+  border: 1px solid var(--c-border);
+  border-bottom-left-radius: 2px;
+}
+
+.bubble--assistant.bubble--error {
+  background: var(--c-danger-subtle);
+  border-color: var(--c-danger-border);
+  color: var(--c-danger);
+}
+
+.bubble--pending { color: var(--c-text-tertiary); font-style: italic; }
+
+.bubble__text { margin: 0; }
+
+.bubble__meta {
+  margin-top: var(--sp-2);
+  font-size: 10px;
+  color: var(--c-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.bubble--user .bubble__meta { color: rgb(255 255 255 / 75%); }
+
+/* Tool trace: collapsed by default. The user asked a question, not for a
+   traceback; the trace is there so a wrong answer can be audited. */
+
+.bubble__tools {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--c-text-secondary);
+}
+
+.bubble__tools summary { cursor: pointer; }
+
+.bubble__tools ul {
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-4);
+}
+
+.bubble__tools pre {
+  margin: var(--sp-1) 0;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  background: var(--c-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+/* --- Footer -------------------------------------------------------------- */
+
+.assistant__foot {
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--c-border);
+}
+
+.assistant__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-3);
+}
+
+.assistant__preset {
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-full);
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.assistant__preset:hover:not(:disabled) {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.assistant__preset:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.assistant__input { display: flex; gap: var(--sp-2); align-items: flex-end; }
+
+.assistant__input .textarea { flex: 1; min-height: 38px; font-size: var(--fs-sm); }
+
+.assistant__trace {
+  display: block;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--c-text-tertiary);
+}
+
+/* --- Layout integration --------------------------------------------------- */
+
+.with-assistant {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .with-assistant { grid-template-columns: minmax(0, 1fr); }
+
+  .assistant {
+    position: static;
+    width: auto;
+    max-height: 520px;
+  }
+}

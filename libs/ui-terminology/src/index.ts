@@ -182,6 +182,70 @@ export const TERM_COPY: Readonly<Record<TechnicalTerm, TermCopy>> = {
 } as const;
 
 /**
+ * Model-service choices offered in 系统管理 → 智能训练助手.
+ *
+ * An operator picking a gateway does need to know which service they are
+ * pointing at, so the technical product name appears in the hint while the
+ * visible label stays business language. Keeping the technical names here rather
+ * than in the settings component is also what lets the leak scan keep working:
+ * this package is the one place technical wording is allowed to live.
+ */
+export const SERVICE_IDS = [
+  'openai',
+  'deepseek',
+  'dashscope',
+  'moonshot',
+  'ollama',
+  'vllm',
+  'local_llamacpp',
+  'custom',
+] as const;
+
+export type ServiceId = (typeof SERVICE_IDS)[number];
+
+export interface ServiceCopy {
+  readonly label: string;
+  /** Technical product name plus when to prefer it. Shown as the hint. */
+  readonly hint: string;
+  readonly needsApiKey: boolean;
+}
+
+export const SERVICE_COPY: Readonly<Record<ServiceId, ServiceCopy>> = {
+  openai: { label: 'OpenAI', hint: '需填写访问密钥', needsApiKey: true },
+  deepseek: { label: 'DeepSeek', hint: '需填写访问密钥', needsApiKey: true },
+  dashscope: { label: '阿里云百炼', hint: '需填写访问密钥', needsApiKey: true },
+  moonshot: { label: 'Moonshot', hint: '需填写访问密钥', needsApiKey: true },
+  ollama: {
+    label: '本地轻量推理服务',
+    hint: 'Ollama：适合小规模本地推理，无需密钥',
+    needsApiKey: false,
+  },
+  vllm: {
+    label: '本地高速推理服务',
+    hint: 'vLLM：适合批量评测，单机吞吐更高，无需密钥',
+    needsApiKey: false,
+  },
+  local_llamacpp: {
+    label: '平台自部署模型',
+    hint: 'llama.cpp：直接调用本平台训练出的模型，数据不离开本部署，无需密钥',
+    needsApiKey: false,
+  },
+  custom: { label: '自定义网关', hint: '需填写访问密钥，取决于网关要求', needsApiKey: true },
+};
+
+export function serviceLabel(id: ServiceId): string {
+  return SERVICE_COPY[id].label;
+}
+
+export function serviceHint(id: ServiceId): string {
+  return SERVICE_COPY[id].hint;
+}
+
+export function serviceNeedsApiKey(id: ServiceId): boolean {
+  return SERVICE_COPY[id].needsApiKey;
+}
+
+/**
  * Substrings that must never appear in rendered UI text.
  *
  * The scan test in apps/web greps component source for these. Adding an entry
@@ -201,6 +265,7 @@ export const FORBIDDEN_IN_UI: readonly string[] = [
   'PEFT',
   'llama.cpp',
   'vLLM',
+  'Ollama',
   'bitandbytes',
   'bitsandbytes',
   'P50',

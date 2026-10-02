@@ -6,6 +6,11 @@ import {
   FORBIDDEN_IN_UI,
   label,
   hint,
+  SERVICE_COPY,
+  SERVICE_IDS,
+  serviceHint,
+  serviceLabel,
+  serviceNeedsApiKey,
   TECHNICAL_TERMS,
   TERM_COPY,
   type TechnicalTerm,
@@ -65,6 +70,47 @@ describe('vocabulary completeness', () => {
 describe('labels never leak technical wording', () => {
   it.each(TECHNICAL_TERMS)('%s label is jargon-free', (term) => {
     expect(findTechnicalLeaks(label(term))).toEqual([]);
+  });
+});
+
+describe('service choices', () => {
+  it('has an entry for every declared service id', () => {
+    for (const id of SERVICE_IDS) {
+      expect(SERVICE_COPY[id], `missing copy for ${id}`).toBeDefined();
+      expect(serviceLabel(id).length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('labels are jargon-free', () => {
+    for (const id of SERVICE_IDS) {
+      expect(findTechnicalLeaks(SERVICE_COPY[id].label)).toEqual([]);
+    }
+  });
+
+  it('hints carry the technical product name', () => {
+    /** The operator has to know which service they are pointing at, so the
+     *  technical name lives in the hint rather than the label. */
+    expect(serviceHint('vllm')).toContain('vLLM');
+    expect(serviceHint('ollama')).toContain('Ollama');
+    expect(serviceHint('local_llamacpp')).toContain('llama.cpp');
+  });
+
+  it('local gateways are marked as needing no key', () => {
+    expect(serviceNeedsApiKey('ollama')).toBe(false);
+    expect(serviceNeedsApiKey('vllm')).toBe(false);
+    expect(serviceNeedsApiKey('local_llamacpp')).toBe(false);
+  });
+
+  it('hosted services are marked as needing a key', () => {
+    for (const id of ['openai', 'deepseek', 'dashscope', 'moonshot', 'custom'] as const) {
+      expect(serviceNeedsApiKey(id), id).toBe(true);
+    }
+  });
+
+  it('every hint explains when to prefer it', () => {
+    for (const id of SERVICE_IDS) {
+      expect(serviceHint(id).length, id).toBeGreaterThan(4);
+    }
   });
 });
 

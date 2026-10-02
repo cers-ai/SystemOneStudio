@@ -13,6 +13,24 @@ export interface Artifactrecord {
   is_recommended?: boolean;
 }
 
+export interface Askrequest {
+  question: string;
+  current_step?: string | null;
+  history?: unknown[];
+  quality_report?: Record<string, unknown> | null;
+  has_data?: boolean;
+  has_quality?: boolean;
+}
+
+export interface Askresponse {
+  text: string;
+  tool_calls: unknown[];
+  rounds: number;
+  elapsed_ms: number;
+  truncated: boolean;
+  usage: Record<string, unknown>;
+}
+
 export interface Auditentry {
   id: string;
   actor: string;
@@ -121,6 +139,11 @@ export interface Healthresponse {
   jev_spec_version: string;
 }
 
+export interface Historyturn {
+  role: string;
+  content: string;
+}
+
 export interface Httpvalidationerror {
   detail?: unknown[];
 }
@@ -209,6 +232,12 @@ export interface Predictresponse {
   jev_compatible?: boolean;
 }
 
+export interface Preferencesview {
+  ground_with_platform_state: boolean;
+  max_tool_rounds: number;
+  require_confirmation_for_actions: boolean;
+}
+
 export interface Previewresponse {
   columns: unknown[];
   rows: unknown[];
@@ -232,6 +261,11 @@ export interface Project {
   scene_code: string | null;
   created_at: string;
   note?: string;
+}
+
+export interface Providersview {
+  providers: Record<string, unknown>;
+  needs_api_key: unknown[];
 }
 
 export interface Qualityresponse {
@@ -283,6 +317,20 @@ export interface Servicestatus {
   detail: string;
 }
 
+export interface Settingsview {
+  provider: string;
+  base_url: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  timeout_s: number;
+  supports_tools: boolean;
+  enabled: boolean;
+  configured: boolean;
+  has_api_key: boolean;
+  masked_key: string;
+}
+
 export interface Splitresponse {
   train_rows: number;
   valid_rows: number;
@@ -290,6 +338,12 @@ export interface Splitresponse {
   test_contains_synth: boolean;
   label_distribution: Record<string, unknown>;
   undersized_groups: unknown[];
+}
+
+export interface Suggestrequest {
+  current_step?: string | null;
+  has_data?: boolean;
+  has_quality?: boolean;
 }
 
 export type Synthmethod = "distribution_fit" | "small_sample_derive" | "rule_injection";
@@ -326,7 +380,35 @@ export interface Systemstatus {
   notes: unknown[];
 }
 
+export interface Toolinvocation {
+  name: string;
+  arguments: Record<string, unknown>;
+  result: Record<string, unknown>;
+}
+
+export interface Toolsview {
+  tools: unknown[];
+}
+
 export type Uimode = "wizard" | "canvas" | "rapid" | "expert";
+
+export interface Updatepreferencesrequest {
+  ground_with_platform_state?: boolean | null;
+  max_tool_rounds?: number | null;
+  require_confirmation_for_actions?: boolean | null;
+}
+
+export interface Updatesettingsrequest {
+  provider?: string | null;
+  base_url?: string | null;
+  model?: string | null;
+  api_key?: string | null;
+  temperature?: number | null;
+  max_tokens?: number | null;
+  timeout_s?: number | null;
+  supports_tools?: boolean | null;
+  enabled?: boolean | null;
+}
 
 export interface Validationerror {
   loc: unknown[];

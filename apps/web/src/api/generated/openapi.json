@@ -784,6 +784,281 @@
         }
       }
     },
+    "/api/assistant/providers": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "可选服务商",
+        "operationId": "providers_api_assistant_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/settings": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "读取助手配置",
+        "operationId": "get_settings_api_assistant_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "保存助手配置",
+        "operationId": "update_settings_api_assistant_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/settings/probe": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "测试连通性",
+        "description": "Check the endpoint before claiming the configuration works.\n\nA save button that reports success for a broken endpoint is worse than no\nsave button.",
+        "operationId": "probe_settings_api_assistant_settings_probe_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Probe Settings Api Assistant Settings Probe Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/preferences": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "读取助手行为偏好",
+        "operationId": "get_preferences_api_assistant_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "保存助手行为偏好",
+        "operationId": "update_preferences_api_assistant_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/tools": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "助手可调用的工具",
+        "description": "Catalogue, so an operator can see exactly what the assistant can reach.",
+        "operationId": "tools_api_assistant_tools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/ask": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "向助手提问",
+        "description": "One assistant turn.\n\nRefusals surface as 409 rather than 200 with an apologetic message, so the\nUI can tell \"not configured\" from \"the model said something unhelpful\".",
+        "operationId": "ask_api_assistant_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/suggest": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "获取与当前步骤相关的引导语",
+        "description": "Contextual placeholder text.\n\nFree: no model call. A suggestion that costs a round trip would be a bad\ndefault for something rendered on every step change.",
+        "operationId": "suggest_api_assistant_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Suggest Api Assistant Suggest Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -916,6 +1191,106 @@
           "format"
         ],
         "title": "ArtifactRecord"
+      },
+      "AskRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "current_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Step"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryTurn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          },
+          "quality_report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Report"
+          },
+          "has_data": {
+            "type": "boolean",
+            "title": "Has Data",
+            "default": false
+          },
+          "has_quality": {
+            "type": "boolean",
+            "title": "Has Quality",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest"
+      },
+      "AskResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolInvocation"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          },
+          "rounds": {
+            "type": "integer",
+            "title": "Rounds"
+          },
+          "elapsed_ms": {
+            "type": "number",
+            "title": "Elapsed Ms"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "usage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Usage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "tool_calls",
+          "rounds",
+          "elapsed_ms",
+          "truncated",
+          "usage"
+        ],
+        "title": "AskResponse"
       },
       "AuditEntry": {
         "properties": {
@@ -1457,6 +1832,26 @@
         ],
         "title": "HealthResponse"
       },
+      "HistoryTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^(user|assistant)$",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "HistoryTurn"
+      },
       "JevCompatLevel": {
         "type": "string",
         "enum": [
@@ -1812,6 +2207,29 @@
         "title": "PredictResponse",
         "description": "Decision output. Field set is identical whether or not JEV format\ncompatibility is on, so callers need only one parser.\n\n``jev_compatible`` tells the caller which contract they are actually\nholding. It is false when the scene runs with ``jev_format_compat``\ndisabled, in which case `reason` is no longer bound by the JEV schema."
       },
+      "PreferencesView": {
+        "properties": {
+          "ground_with_platform_state": {
+            "type": "boolean",
+            "title": "Ground With Platform State"
+          },
+          "max_tool_rounds": {
+            "type": "integer",
+            "title": "Max Tool Rounds"
+          },
+          "require_confirmation_for_actions": {
+            "type": "boolean",
+            "title": "Require Confirmation For Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ground_with_platform_state",
+          "max_tool_rounds",
+          "require_confirmation_for_actions"
+        ],
+        "title": "PreferencesView"
+      },
       "PreviewResponse": {
         "properties": {
           "columns": {
@@ -1944,6 +2362,30 @@
           "created_at"
         ],
         "title": "Project"
+      },
+      "ProvidersView": {
+        "properties": {
+          "providers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Providers"
+          },
+          "needs_api_key": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Needs Api Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "providers",
+          "needs_api_key"
+        ],
+        "title": "ProvidersView"
       },
       "QualityResponse": {
         "properties": {
@@ -2202,6 +2644,70 @@
         ],
         "title": "ServiceStatus"
       },
+      "SettingsView": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "timeout_s": {
+            "type": "number",
+            "title": "Timeout S"
+          },
+          "supports_tools": {
+            "type": "boolean",
+            "title": "Supports Tools"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "title": "Has Api Key"
+          },
+          "masked_key": {
+            "type": "string",
+            "title": "Masked Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "base_url",
+          "model",
+          "temperature",
+          "max_tokens",
+          "timeout_s",
+          "supports_tools",
+          "enabled",
+          "configured",
+          "has_api_key",
+          "masked_key"
+        ],
+        "title": "SettingsView",
+        "description": "Read shape. No key, ever."
+      },
       "SplitResponse": {
         "properties": {
           "train_rows": {
@@ -2248,6 +2754,33 @@
           "undersized_groups"
         ],
         "title": "SplitResponse"
+      },
+      "SuggestRequest": {
+        "properties": {
+          "current_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Step"
+          },
+          "has_data": {
+            "type": "boolean",
+            "title": "Has Data",
+            "default": false
+          },
+          "has_quality": {
+            "type": "boolean",
+            "title": "Has Quality",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "SuggestRequest"
       },
       "SynthMethod": {
         "type": "string",
@@ -2422,6 +2955,48 @@
         ],
         "title": "SystemStatus"
       },
+      "ToolInvocation": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Arguments"
+          },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "arguments",
+          "result"
+        ],
+        "title": "ToolInvocation"
+      },
+      "ToolsView": {
+        "properties": {
+          "tools": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tools"
+        ],
+        "title": "ToolsView"
+      },
       "UiMode": {
         "type": "string",
         "enum": [
@@ -2432,6 +3007,160 @@
         ],
         "title": "UiMode",
         "description": "Interaction modes. All four share one engine and one flow definition."
+      },
+      "UpdatePreferencesRequest": {
+        "properties": {
+          "ground_with_platform_state": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground With Platform State"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
+          "require_confirmation_for_actions": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Confirmation For Actions"
+          }
+        },
+        "type": "object",
+        "title": "UpdatePreferencesRequest",
+        "description": "Partial update: omitting a field leaves it alone.\n\nThe read model is a full object, so accepting it as the write model would\nforce a client to round-trip everything it does not intend to change."
+      },
+      "UpdateSettingsRequest": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32000.0,
+                "minimum": 64.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "timeout_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 600.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout S"
+          },
+          "supports_tools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tools"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "title": "UpdateSettingsRequest",
+        "description": "Write shape.\n\n``api_key`` is optional and omitted-means-unchanged, so saving one field does\nnot wipe the secret. Send an empty string to clear it deliberately."
       },
       "ValidationError": {
         "properties": {
