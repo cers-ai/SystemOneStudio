@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from son_db import workspace
+from son_orchestrator.runstate import RunState
 
 from son_contracts import QuantLevel, SynthMethod, TrainingMethod
 from son_worker.prepare import (
@@ -146,6 +147,7 @@ def train_skill(context: Any) -> dict[str, Any]:
 
     model_path = _model_path(base_model_id)
 
+    _advance(context, RunState.TRAINING)
     context.progress(15, stage="TRAIN", message="开始训练")
     run = run_training(
         request,
@@ -167,9 +169,11 @@ def train_skill(context: Any) -> dict[str, Any]:
 
     model = get_adapter("qwen25")(model_path)
 
+    _advance(context, RunState.MERGING)
     context.progress(60, stage="MERGE", message="合并权重")
     merged = model.merge_lora(model_path, adapter, str(_run_dir(run_id) / "model" / "merged"))
 
+    _advance(context, RunState.QUANTIZING)
     context.progress(80, stage="QUANTIZE", message="导出 Q4_K_M")
     gguf_path = model.export_gguf(
         merged,
@@ -203,6 +207,20 @@ def train_skill(context: Any) -> dict[str, Any]:
             "notes": list(run.notes),
         },
     }
+
+
+def _advance(context: Any, target: Any) -> None:
+    """Move the run to the state this stage represents.
+
+    Non-strict: the intermediate states legitimately have no new asset to point
+    at yet, because the artifact appears at the end of the stage.
+    """
+    from son_worker.progress import RunAdvanceError, advance
+
+    try:
+        advance(context.database, context.job.run_id, target, strict=False)
+    except RunAdvanceError as exc:
+        raise SkillUnavailable(str(exc)) from exc
 
 
 def _model_path(model_id: str) -> str:

@@ -128,6 +128,12 @@ testpaths = [
   "services/inference/tests",
   "services/jev-adapter/tests",
   "services/assistant/tests",
+  "tests/e2e",
 ]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"
+# `gpu` marks tests that need real hardware. They are skipped unless SON_GPU=1,
+# so the default CPU run stays fast and hermetic (改造开发方案.md 33.1).
+markers = [
+  "gpu: requires an NVIDIA GPU; set SON_GPU=1 to run",
+]
