@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 
 import { assistantApi } from '@/api/assistant';
 import { AssistantPanel } from '@/features/assistant/AssistantPanel';
+import { RunWizard } from '@/features/wizard/RunWizard';
 import { currentPath, navigate, routeTitle, ROUTES, type RoutePath } from '@/app/routes';
 import { HomeView } from '@/views/HomeView';
 import { ProjectsView } from '@/views/ProjectsView';
 import { ScenesView } from '@/views/ScenesView';
 import { SystemView } from '@/views/SystemView';
-import { WizardView } from '@/views/WizardView';
 import './styles/global.css';
 import './styles/app-shell.css';
 import './styles/assistant.css';
@@ -40,6 +40,9 @@ export function App() {
   // configure the assistant, and a chat box next to its own settings is noise.
   const assistantVisible =
     assistantOpen && assistantSettings.data?.enabled !== false && path !== 'system';
+
+  // The Run id comes from the route; the wizard holds no state of its own.
+  const runId = path.startsWith('run/') ? path.slice(4) : null;
 
   return (
     <div className="shell">
@@ -106,7 +109,7 @@ export function App() {
             {path === '' ? <HomeView onNavigate={navigate} /> : null}
             {path === 'projects' ? <ProjectsView /> : null}
             {path === 'scenes' ? <ScenesView /> : null}
-            {path === 'wizard' ? <WizardView /> : null}
+            {path === 'wizard' || runId ? <RunWizard runId={runId} /> : null}
             {path === 'system' ? <SystemView /> : null}
           </div>
 

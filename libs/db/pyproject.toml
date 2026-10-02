@@ -13,11 +13,10 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
+# Includes everything under src/son_db, migrations/*.sql included: a deployed
+# image has to be able to bring its own schema up to date. Do not add a
+# force-include for it -- that would require the directory to exist before the
+# dependency layer is installed, which breaks the layered Docker build.
 packages = ["src/son_db"]
-
-# The migrations directory ships inside the package: a deployed image has to be
-# able to bring its own schema up to date.
-[tool.hatch.build.targets.wheel.force-include]
-"src/son_db/migrations" = "son_db/migrations"
 
 [tool.uv.sources]

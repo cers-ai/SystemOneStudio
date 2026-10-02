@@ -1,18 +1,24 @@
 name: systemone-studio
 
-# Containerized deployment.
+# Containerized deployment (改造开发方案.md 28).
 #
-#   npm run up        # docker compose ... up -d --build
+#   npm run up     # docker compose ... up -d --build
 #   open http://127.0.0.1:9969
 #
-# Port 9969 is the single public entry point: nginx serves the SPA and proxies
-# /api, /meta, /health, /v1 and /docs to the control plane. Nothing else is
-# published to the host, so the database and queue are reachable only on the
-# internal network.
+# Two processes, one port:
+#   web  nginx: serves the SPA and proxies the API, so the browser sees one origin
+#   api  FastAPI: control plane, owns runtime/ on a mounted volume
+#   worker: the job runner, started separately (see worker below)
 #
-# NOT INCLUDED: training, GGUF quantization and llama.cpp inference. Those need an
-# NVIDIA GPU, which this machine does not have, and their images are multi-GB.
-# They ship from deploy/gpu/ on a GPU node. See AGENTS.md.
+# PostgreSQL and Redis are gone. State lives in runtime/systemone.db and the
+# run assets in runtime/workspace, both on a bind mount so they survive a rebuild
+# and can be inspected from the host. 改造开发方案.md 28.
+#
+# The worker runs in its own profile because it needs the GPU stack; the control
+# plane does not, and shipping torch to the API container would triple its size
+# for no benefit.
+#
+#   docker compose -f deploy/compose/docker-compose.prod.yml --profile worker up -d
 
 services:
   web:
@@ -36,86 +42,47 @@ services:
     image: son-api:0.1.0
     container_name: son-api
     restart: unless-stopped
-    # Deliberately NOT published. Reach the API through nginx on 9969; exposing
-    # it too would create a second, unproxied path to the control plane.
     expose:
       - '9969'
     environment:
-      SON_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-son}:${POSTGRES_PASSWORD:-son_local_only}@postgres:5432/${POSTGRES_DB:-sonstudio}
-      SON_REDIS_URL: redis://redis:6379/0
-      # Model artifacts: adapters, merged weights, GGUF. A volume rather than a
-      # database column or an object store -- see 技术方案.md 3.1.
-      SON_MODELS_DIR: /data/models
+      SON_DB_PATH: /data/systemone.db
+      SON_WORKSPACE: /data/workspace
     volumes:
-      - model-data:/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - ${SON_DATA_DIR:-./runtime}:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9969/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks: [sonnet]
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: son-postgres
+  # The GPU half. Started only with --profile worker.
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/gpu/Dockerfile.gpu
+    image: son-gpu:0.1.0
+    container_name: son-worker
+    profiles: ['worker']
     restart: unless-stopped
+    gpus: all
+    shm_size: '8gb'
+    command: ['python', '-m', 'son_worker']
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-son}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-son_local_only}
-      POSTGRES_DB: ${POSTGRES_DB:-sonstudio}
+      SON_DB_PATH: /data/systemone.db
+      SON_WORKSPACE: /data/workspace
+      HF_HOME: /data/hf-cache
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-son} -d ${POSTGRES_DB:-sonstudio}']
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      - ${SON_DATA_DIR:-./runtime}:/data
+    depends_on:
+      api:
+        condition: service_healthy
     networks: [sonnet]
-
-  redis:
-    image: redis:7-alpine
-    container_name: son-redis
-    restart: unless-stopped
-    command: ['redis-server', '--appendonly', 'yes']
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [sonnet]
-
-# Storage design, and why there is no object store here.
-#
-# 需求方案.txt 11 lists "MinIO + PostgreSQL" in the tech stack. That line is
-# overridden here, and the reasoning is recorded in 技术方案.md 3.1 and section 10:
-#
-#   - Nothing in the code reads it. There is no S3 client anywhere.
-#   - Sizing from the requirement's own numbers: seed data ~15,000x32 is a few
-#     MB and the 500,000-row synthetic set is ~150MB. Both fit PostgreSQL
-#     comfortably, and both are *relational* -- the split filters them by
-#     origin and label -- so a database is the right home, not blob storage.
-#   - The only genuinely large artifacts are model weights: merged bf16 for a 3B
-#     model is ~6GB, GGUF Q4_K_M ~2GB. Those are written once at the end of a
-#     training run and read once at deploy time. No streaming, no concurrent
-#     random writes, no sharing across many records. A database column would be
-#     worse than a file, and an object store would buy nothing.
-#   - The cost is not zero: a second container, health check, credential set,
-#     backup story and failure mode. 需求方案.txt 13 lists 范围膨胀 as a risk with
-#     "砍掉非核心功能" as the mitigation.
-#
-# Object storage returns in 阶段二, where the argument is real: multiple nodes and
-# the model marketplace both need artifacts shared across hosts.
 
 networks:
-  # Plain bridge, not `internal: true`: the API may need to pull base models
-  # later. The sandbox requirement in 需求方案.txt 13 applies to the
-  # training/synthesis workers, not to this control plane.
   sonnet:
     driver: bridge
 
-volumes:
-  postgres-data:
-  redis-data:
-  model-data:
+# No volumes: runtime/ is a bind mount so the host can read the database, inspect
+# a failed job's log, and copy a GGUF out. A named volume would hide all three.

@@ -62,17 +62,19 @@ RUN git clone --depth 1 --branch ${LLAMA_CPP_VERSION} \
 # Dependency layer before source, so it caches.
 COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
+COPY services/worker/pyproject.toml services/worker/pyproject.toml
 COPY libs/contracts/pyproject.toml libs/contracts/pyproject.toml
 COPY libs/model-registry/pyproject.toml libs/model-registry/pyproject.toml
 COPY services/orchestrator/pyproject.toml services/orchestrator/pyproject.toml
 COPY services/data-pipeline/pyproject.toml services/data-pipeline/pyproject.toml
 COPY services/synth/pyproject.toml services/synth/pyproject.toml
 COPY services/trainer/pyproject.toml services/trainer/pyproject.toml
+COPY libs/db/pyproject.toml libs/db/pyproject.toml
 COPY services/quantizer/pyproject.toml services/quantizer/pyproject.toml
 COPY services/evaluator/pyproject.toml services/evaluator/pyproject.toml
+COPY services/assistant/pyproject.toml services/assistant/pyproject.toml
 COPY services/inference/pyproject.toml services/inference/pyproject.toml
 COPY services/jev-adapter/pyproject.toml services/jev-adapter/pyproject.toml
-COPY services/assistant/pyproject.toml services/assistant/pyproject.toml
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy \
@@ -91,12 +93,12 @@ COPY services/ services/
 COPY apps/api/src/ apps/api/src/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --python /opt/venv/bin/python --no-deps \
-        son-contracts son-model-registry son-orchestrator son-data-pipeline \
+    uv pip install --python /opt/venv/bin/python \
+        son-contracts son-db son-model-registry son-orchestrator son-data-pipeline \
         son-synth son-trainer son-quantizer son-evaluator son-inference \
-        son-jev-adapter son-assistant \
+        son-jev-adapter son-assistant son-worker \
     && uv pip install --python /opt/venv/bin/python \
-        fastapi uvicorn pydantic pydantic-settings sqlalchemy python-multipart httpx redis numpy pandas \
+        pydantic httpx numpy pandas huggingface_hub \
     && /opt/venv/bin/python -c "import torch, transformers, peft, trl; print('training stack', torch.__version__, torch.cuda.is_available())"
 
 ENV PATH="/opt/venv/bin:${PATH}" \
@@ -116,4 +118,4 @@ HEALTHCHECK --interval=60s --timeout=20s --start-period=30s --retries=3 \
     CMD /opt/venv/bin/python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" \
     || /opt/venv/bin/python -c "from son_inference.llamacpp_client import gpu_report; print(gpu_report())"
 
-CMD ["python", "-m", "son_cli", "serve"]
+CMD ["python", "-m", "son_worker"]

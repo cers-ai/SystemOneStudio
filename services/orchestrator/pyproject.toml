@@ -9,7 +9,6 @@ description = "7-step workflow state machine and task dispatch."
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "pydantic>=2.7",
-  "redis>=5.0",
   "son-contracts",
 ]
 
