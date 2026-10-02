@@ -107,6 +107,15 @@ class BaseModelAdapter(ABC):
     #: Registry key matching `RegistryModel.adapter_type`.
     adapter_type: ClassVar[str] = "base"
 
+    def __init__(self, model_path: str) -> None:
+        """Bind the adapter to one model path.
+
+        Every adapter needs it, and passing it per call would mean threading it
+        through every method. The seven abstract signatures below are unchanged
+        from 需求方案.txt 7.3.
+        """
+        self.model_path = model_path
+
     @abstractmethod
     def load_tokenizer(self, model_path: str) -> Any:
         """Load and return the tokenizer for `model_path`."""

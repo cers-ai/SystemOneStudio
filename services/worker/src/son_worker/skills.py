@@ -98,14 +98,13 @@ def prepare_skill(context: Any) -> dict[str, Any]:
 def train_skill(context: Any) -> dict[str, Any]:
     """Step 7: train, merge and quantize, then report the artifact.
 
-    Everything heavy happens here and every intermediate result is recorded, so
-    a failure halfway through leaves a checkpoint and a log behind rather than
-    an unexplained gap.
+    Everything model-specific is delegated to the adapter
+    (改造开发方案.md 14). This function does not import transformers and does not
+    branch on which family it is training -- adding Gemma later means adding an
+    adapter, not editing this file.
     """
     _require_gpu()
 
-    from son_quantizer import QuantizeRequest, quantize_all
-    from son_quantizer.peft_merge import LlamaCppConverter
     from son_trainer import (
         DatasetProfile,
         TorchRunConfig,
@@ -114,10 +113,12 @@ def train_skill(context: Any) -> dict[str, Any]:
         TrainSample,
         run_training,
     )
-    from son_trainer.torch_backend import TrainingUnavailable
+
+    from son_model_registry import get_adapter
 
     run_id = context.job.run_id
     payload = context.payload
+    base_model_id = payload["base_model"]
 
     train_path = Path(payload["train_path"])
     synth_path = Path(payload["synth_path"]) if payload.get("synth_path") else None
@@ -137,22 +138,24 @@ def train_skill(context: Any) -> dict[str, Any]:
     profile = DatasetProfile(rows=len(samples), params_b=float(payload.get("params_b", 1.5)))
     request = TrainRequest(
         job_id=context.job.id,
-        base_model=payload["base_model"],
+        base_model=base_model_id,
         methods=(TrainingMethod.SFT,),
         samples=samples,
         profile=profile,
     )
-    backend = TorchTrainingBackend(
-        TorchRunConfig(
-            base_model=payload["base_model"], output_dir=str(_run_dir(run_id) / "training")
-        )
-    )
+
+    model_path = _model_path(base_model_id)
 
     context.progress(15, stage="TRAIN", message="开始训练")
-    try:
-        run = run_training(request, backend)
-    except TrainingUnavailable as exc:
-        raise SkillUnavailable(str(exc)) from exc
+    run = run_training(
+        request,
+        TorchTrainingBackend(
+            TorchRunConfig(
+                base_model=model_path,
+                output_dir=str(_run_dir(run_id) / "training"),
+            )
+        ),
+    )
 
     if not run.succeeded:
         raise SkillUnavailable(run.failure_reason or "训练未成功")
@@ -162,37 +165,35 @@ def train_skill(context: Any) -> dict[str, Any]:
         # Rule 4: no real file, no artifact.
         raise SkillUnavailable(f"训练结束但没有产出适配器文件：{adapter}")
 
+    model = get_adapter("qwen25")(model_path)
+
     context.progress(60, stage="MERGE", message="合并权重")
-    tools = LlamaCppConverter()
-    merged = tools.merge_lora(
-        payload["base_model"], adapter, str(_run_dir(run_id) / "model" / "merged")
-    )
+    merged = model.merge_lora(model_path, adapter, str(_run_dir(run_id) / "model" / "merged"))
 
     context.progress(80, stage="QUANTIZE", message="导出 Q4_K_M")
-    result = quantize_all(
-        QuantizeRequest(
-            merged_path=merged,
-            output_dir=str(_run_dir(run_id) / "model"),
-            model_version=f"mv_{run_id[-4:]}",
-            levels=(QuantLevel.Q4_K_M,),
-        ),
-        tools,
-        include_native=False,
-        hash_outputs=True,
+    gguf_path = model.export_gguf(
+        merged,
+        str(_run_dir(run_id) / "model" / "model-q4_k_m.gguf"),
+        QuantLevel.Q4_K_M,
     )
 
-    gguf = result.recommended
-    if gguf is None:
-        raise SkillUnavailable("未产出 Q4_K_M 产物")
+    from son_db.assets import bytes_of
+    from son_db.assets import checksum as file_checksum
 
-    context.progress(90, stage="QUANTIZE", message="校验产物")
+    gguf = Path(gguf_path)
+    if not gguf.exists():
+        # A GGUF that was never written would corrupt every evaluation that
+        # touched it.
+        raise SkillUnavailable(f"量化声称成功但产物不存在：{gguf}")
+
+    context.progress(90, stage="QUANTIZE", message="记录产物")
     return {
         "adapter_path": adapter,
         "merged_path": merged,
-        "gguf_path": gguf.path,
-        "gguf_checksum": gguf.sha256,
-        "gguf_bytes": gguf.size_bytes,
-        "quant_level": gguf.quant.value if gguf.quant else None,
+        "gguf_path": str(gguf),
+        "gguf_checksum": file_checksum(gguf),
+        "gguf_bytes": bytes_of(gguf),
+        "quant_level": "Q4_K_M",
         "training": {
             "stages": [
                 {"stage": s.stage, "status": s.status, "step": s.step, "metrics": s.metrics}
@@ -202,6 +203,16 @@ def train_skill(context: Any) -> dict[str, Any]:
             "notes": list(run.notes),
         },
     }
+
+
+def _model_path(model_id: str) -> str:
+    """Registry id to a local path, with the reason surfaced on failure."""
+    from son_model_registry import QwenAdapterUnavailable, resolve_model_path
+
+    try:
+        return resolve_model_path(model_id)
+    except QwenAdapterUnavailable as exc:
+        raise SkillUnavailable(str(exc)) from exc
 
 
 def _render_prompt(row: dict[str, str]) -> str:

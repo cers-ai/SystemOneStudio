@@ -107,6 +107,7 @@ module = [
   "peft.*",
   "trl.*",
   "datasets.*",
+  "huggingface_hub.*",
 ]
 ignore_missing_imports = true
 

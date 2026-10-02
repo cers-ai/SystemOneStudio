@@ -35,3 +35,40 @@ __all__ = [
     "llama_cpp_available",
     "start_server",
 ]
+from son_inference.deployment import (
+    Deployment,
+    DeploymentFailed,
+    DeploymentStatus,
+    binary_available,
+    curl_example,
+    health_check,
+    start,
+    stop,
+)
+from son_inference.evaluate import (
+    EvaluationOutcome,
+    InferenceUnavailable,
+    PredictionRecord,
+    build_predict_response,
+    read_test_rows,
+    run_evaluation,
+    summarize_latency,
+)
+
+__all__ += [
+    "Deployment",
+    "DeploymentFailed",
+    "DeploymentStatus",
+    "EvaluationOutcome",
+    "InferenceUnavailable",
+    "PredictionRecord",
+    "binary_available",
+    "build_predict_response",
+    "curl_example",
+    "health_check",
+    "read_test_rows",
+    "run_evaluation",
+    "start",
+    "stop",
+    "summarize_latency",
+]

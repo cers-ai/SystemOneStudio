@@ -1456,6 +1456,7 @@ version = "0.1.0"
 source = { editable = "services/inference" }
 dependencies = [
     { name = "httpx" },
+    { name = "pandas" },
     { name = "pydantic" },
     { name = "son-contracts" },
 ]
@@ -1463,6 +1464,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
+    { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "son-contracts", editable = "libs/contracts" },
 ]

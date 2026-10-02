@@ -23,7 +23,7 @@ class TestAdapterInterface:
             adapter_type = "partial"
 
         with pytest.raises(TypeError):
-            Partial()  # type: ignore[abstract]
+            Partial("m")  # type: ignore[abstract]
 
     def test_requires_concrete_adapter_type(self) -> None:
         class Unkeyed(BaseModelAdapter):
