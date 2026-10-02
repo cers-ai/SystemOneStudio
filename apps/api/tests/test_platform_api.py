@@ -5,7 +5,6 @@ Covers the two P0 modules that had no surface (项目管理 / 场景定义) plus
 
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from son_api.main import create_app
@@ -182,39 +181,6 @@ class TestUpdateJevFlags:
         )
 
 
-class TestProjects:
-    def test_create_and_list(self) -> None:
-        created = _client().post("/api/projects", json={"name": "Q3 反诈"}).json()
-        assert created["code"].startswith("pr_")
-        codes = [p["code"] for p in _client().get("/api/projects").json()]
-        assert created["code"] in codes
-
-    def test_binds_a_scene_code(self) -> None:
-        scene_id = _client().post("/api/scenes", json={"template_id": "fraud_account"}).json()["id"]
-        project = (
-            _client().post("/api/projects", json={"name": "绑定场景", "scene_id": scene_id}).json()
-        )
-        assert project["scene_code"].startswith("sc_v")
-
-    def test_unknown_scene_is_404(self) -> None:
-        assert (
-            _client().post("/api/projects", json={"name": "x", "scene_id": "nope"}).status_code
-            == 404
-        )
-
-    @pytest.mark.parametrize("mode", ["wizard", "rapid", "canvas", "expert"])
-    def test_all_four_modes_are_accepted(self, mode: str) -> None:
-        """需求方案.txt principle 1: four modes over one engine."""
-        body = _client().post("/api/projects", json={"name": f"m-{mode}", "mode": mode}).json()
-        assert body["mode"] == mode
-
-    def test_invalid_mode_is_rejected(self) -> None:
-        assert (
-            _client().post("/api/projects", json={"name": "x", "mode": "telepathy"}).status_code
-            == 422
-        )
-
-
 class TestSystemStatus:
     def test_reports_gpu_truthfully(self) -> None:
         """The whole verification story depends on whether a number came from a
@@ -260,21 +226,21 @@ class TestAudit:
         assert any("格式对齐" in e["detail"] for e in audit)
 
     def test_records_project_creation(self) -> None:
-        _client().post("/api/projects", json={"name": "审计测试"})
-        assert any(
-            e["action"] == "create_project" for e in _client().get("/api/system/audit").json()
-        )
+        """Projects live in the SQLite-backed runs router; scenes still audit here."""
+        _client().post("/api/scenes", json={"template_id": "fraud_account"})
+        actions = [e["action"] for e in _client().get("/api/system/audit").json()]
+        assert "create_scene" in actions
 
     def test_entries_have_a_timestamp(self) -> None:
-        _client().post("/api/projects", json={"name": "时间戳"})
+        _client().post("/api/scenes", json={"template_id": "payment_risk"})
         entry = _client().get("/api/system/audit").json()[0]
         assert entry["ts"]
 
     def test_newest_first(self) -> None:
-        _client().post("/api/projects", json={"name": "第一条"})
-        _client().post("/api/projects", json={"name": "第二条"})
+        _client().post("/api/scenes", json={"template_id": "payment_risk"})
+        _client().post("/api/scenes", json={"template_id": "compliance_review"})
         details = [e["detail"] for e in _client().get("/api/system/audit").json()]
-        assert "第二条" in details[0]
+        assert any("合规审核" in d for d in details[:1])
 
 
 class TestOpenApi:

@@ -10,6 +10,9 @@ venv/
 .coverage
 htmlcov/
 
+# --- Runtime state (SQLite + workspace; see 改造开发方案.md section 6.2) ---
+/runtime/
+
 # --- Node ---
 node_modules/
 dist/

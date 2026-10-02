@@ -16,11 +16,13 @@ dependencies = [
   "sqlalchemy>=2.0",
   "son-assistant",
   "son-contracts",
-  "son-orchestrator",
-  "son-jev-adapter",
+  "son-db",
   "son-evaluator",
   "son-inference",
+  "son-jev-adapter",
   "son-model-registry",
+  "son-orchestrator",
+  "son-worker",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,8 +31,10 @@ packages = ["src/son_api"]
 [tool.uv.sources]
 son-assistant = { workspace = true }
 son-contracts = { workspace = true }
+son-db = { workspace = true }
 son-evaluator = { workspace = true }
 son-inference = { workspace = true }
 son-jev-adapter = { workspace = true }
 son-model-registry = { workspace = true }
 son-orchestrator = { workspace = true }
+son-worker = { workspace = true }

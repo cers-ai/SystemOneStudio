@@ -22,7 +22,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from son_contracts import Decision, JevFlags, UiMode
+from son_contracts import Decision, JevFlags
 
 router = APIRouter(tags=["platform"])
 
@@ -333,54 +333,6 @@ def update_jev_flags(scene_id: str, flags: JevFlags) -> SceneSummary:
         f"格式对齐={flags.jev_format_compat} 训练对齐={flags.jev_training_compat}",
     )
     return _to_summary(record, TEMPLATE_BY_ID.get(str(record.get("template_id", ""))))
-
-
-# --------------------------------------------------------------------------
-# Projects (需求方案.txt 10.1)
-# --------------------------------------------------------------------------
-
-
-class Project(BaseModel):
-    id: str
-    code: str
-    name: str
-    mode: UiMode
-    scene_code: str | None
-    created_at: str
-    note: str = ""
-
-
-class CreateProjectRequest(BaseModel):
-    name: str
-    scene_id: str | None = None
-    mode: UiMode = UiMode.WIZARD
-
-
-@router.get("/api/projects", response_model=list[Project], summary="项目列表")
-def list_projects() -> list[Project]:
-    return [Project(**rec) for rec in STORE.projects.values()]
-
-
-@router.post("/api/projects", response_model=Project, summary="新建项目")
-def create_project(request: CreateProjectRequest) -> Project:
-    scene_code: str | None = None
-    if request.scene_id:
-        scene = STORE.scenes.get(request.scene_id)
-        if scene is None:
-            raise HTTPException(status_code=404, detail=f"未找到场景 {request.scene_id}")
-        scene_code = str(scene["code"])
-
-    project = Project(
-        id=uuid.uuid4().hex[:12],
-        code=STORE.next_project_code(),
-        name=request.name,
-        mode=request.mode,
-        scene_code=scene_code,
-        created_at=datetime.now(UTC).isoformat(),
-    )
-    STORE.projects[project.id] = project.model_dump()
-    STORE.record("当前用户", "create_project", project.code, f"新建项目「{request.name}」")
-    return project
 
 
 # --------------------------------------------------------------------------

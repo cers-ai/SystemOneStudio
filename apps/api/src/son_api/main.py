@@ -8,8 +8,9 @@ generation source. Feature endpoints land per the milestone plan in
 
 from fastapi import FastAPI
 from pydantic import BaseModel
+from son_db import Database, migrate
 
-from son_api.routers import assistant, datasets, models, platform
+from son_api.routers import assistant, datasets, models, platform, runs
 from son_contracts import JEV_SPEC_VERSION, JevFlags
 from son_contracts.predict import JEV_OUTPUT_SCHEMA, PredictRequest, PredictResponse
 
@@ -35,6 +36,20 @@ class JevSpecResponse(BaseModel):
 
 
 def create_app() -> FastAPI:
+    """Build the app and bring its database up to date.
+
+    Migrations run here rather than in a worker or a CLI: an API that starts
+    against an out-of-date schema fails on the first write, and the person who can
+    fix it is the one who cannot start the service.
+    """
+    database = Database.open()
+    applied = migrate(database)
+    runs.configure(database)
+    if applied:
+        import logging
+
+        logging.getLogger("son_api").info("applied migrations: %s", applied)
+
     app = FastAPI(
         title="SystemOneStudio Control Plane",
         version="0.1.0",
@@ -47,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(models.router)
     app.include_router(platform.router)
     app.include_router(assistant.router)
+    app.include_router(runs.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     def health() -> HealthResponse:

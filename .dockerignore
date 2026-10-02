@@ -11,6 +11,9 @@
 .env.*
 !.env.example
 
+# --- Runtime state ---
+/runtime/
+
 # --- Python ---
 .venv/
 venv/

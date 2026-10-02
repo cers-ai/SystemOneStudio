@@ -104,7 +104,7 @@ def ingest_csv(destination: Path, filename: str) -> PreparedDataset:
         raise AssetError(f"CSV（{filename}）没有任何数据行")
 
     from son_data_pipeline.masking import detect_sensitive_columns
-    from son_db.workspace import checksum as file_checksum
+    from son_db.assets import checksum as file_checksum
 
     detection = detect_label_column(frame)
     if detection.column:
@@ -245,7 +245,7 @@ def generate_synth(
     result = synthesize(seed_frame, request)
     frame = result.frame
 
-    from son_db.workspace import checksum as file_checksum
+    from son_db.assets import checksum as file_checksum
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output_path, index=False)

@@ -15,13 +15,13 @@ from pathlib import Path
 from typing import Any
 
 from son_db import workspace
+
+from son_contracts import QuantLevel, SynthMethod, TrainingMethod
 from son_worker.prepare import (
     generate_synth,
     prepare_split,
     training_frame,
 )
-
-from son_contracts import QuantLevel, SynthMethod, TrainingMethod
 
 
 class SkillUnavailable(RuntimeError):

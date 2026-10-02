@@ -12,16 +12,7 @@ from pathlib import Path
 
 import pytest
 from son_db import Database, migrate, reset_database, workspace
-from son_db.database import (
-    applied_versions,
-    available_migrations,
-    current_version,
-    pending_migrations,
-    raw_connection,
-)
-from son_db.models import ALL_MODELS, AuditRow, DatasetRow, ProjectRow, RunRow
-from son_db.repositories import dump, load, record_audit, require, rows_for_run
-from son_db.workspace import (
+from son_db.assets import (
     append_jsonl,
     checksum,
     checksum_text,
@@ -34,6 +25,15 @@ from son_db.workspace import (
     write_json,
     write_text,
 )
+from son_db.database import (
+    applied_versions,
+    available_migrations,
+    current_version,
+    pending_migrations,
+    raw_connection,
+)
+from son_db.models import ALL_MODELS, AuditRow, DatasetRow, ProjectRow, RunRow
+from son_db.repositories import dump, load, record_audit, require, rows_for_run
 
 MIGRATION_SQL = Path(__file__).parent.parent / "src" / "son_db" / "migrations" / "001_init.sql"
 
@@ -303,7 +303,7 @@ class TestWorkspace:
         assert path.parent.exists()
 
     def test_json_roundtrip(self, db: Database) -> None:
-        from son_db.workspace import read_json
+        from son_db.assets import read_json
 
         write_json("run_ws1", "training/config.json", {"lr": 0.0002})
         assert read_json(workspace() / "run_ws1" / "training" / "config.json") == {"lr": 0.0002}
