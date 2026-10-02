@@ -14,6 +14,7 @@ package = false
 members = [
   "apps/api",
   "libs/contracts",
+  "libs/db",
   "libs/model-registry",
   "services/*",
 ]
@@ -65,6 +66,7 @@ python_version = "3.11"
 mypy_path = [
   "apps/api/src",
   "libs/contracts/src",
+  "libs/db/src",
   "libs/model-registry/src",
   "services/data-pipeline/src",
   "services/evaluator/src",
@@ -112,6 +114,7 @@ minversion = "8.0"
 testpaths = [
   "apps/api/tests",
   "libs/contracts/tests",
+  "libs/db/tests",
   "libs/model-registry/tests",
   "services/orchestrator/tests",
   "services/data-pipeline/tests",

@@ -13,6 +13,7 @@ members = [
     "son-assistant",
     "son-contracts",
     "son-data-pipeline",
+    "son-db",
     "son-evaluator",
     "son-inference",
     "son-jev-adapter",
@@ -1410,6 +1411,21 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "son-contracts", editable = "libs/contracts" },
+]
+
+[[package]]
+name = "son-db"
+version = "0.1.0"
+source = { editable = "libs/db" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
 ]
 
 [[package]]
