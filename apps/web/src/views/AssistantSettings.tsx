@@ -62,8 +62,26 @@ export function AssistantSettingsCard() {
   });
 
   const probe = useMutation({
-    mutationFn: () => assistantApi.saveSettings({}).then(() => assistantApi.probe()),
-    onSuccess: (result) => setProbeResult(result),
+    // Save the form first, then probe. It used to PUT an empty body, so the
+    // button labelled "保存并测试连通性" tested the *previously stored*
+    // endpoint -- reporting success for a configuration the operator had just
+    // edited away from.
+    mutationFn: async () => {
+      await assistantApi.saveSettings({
+        provider,
+        base_url: baseUrl,
+        model,
+        temperature,
+        enabled,
+        ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+      });
+      return assistantApi.probe();
+    },
+    onSuccess: (result) => {
+      setApiKey('');
+      setProbeResult(result);
+      void queryClient.invalidateQueries({ queryKey: ['assistant-settings'] });
+    },
   });
 
   const serviceId = (SERVICE_IDS as readonly string[]).includes(provider)

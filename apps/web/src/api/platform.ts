@@ -102,6 +102,17 @@ function extractDetail(body: string): string {
   return body.slice(0, 200);
 }
 
+export interface ModelCard {
+  model_id: string;
+  display_name: string;
+  family: string;
+  params: string;
+  min_gpu_memory: string;
+  jev_compat_level: string | null;
+  license: string;
+  in_mvp_scope: boolean;
+}
+
 export const platformApi = {
   templates: () => request<SceneTemplate[]>('/api/scenes/templates'),
   scenes: () => request<SceneSummary[]>('/api/scenes'),
@@ -123,7 +134,11 @@ export const platformApi = {
   systemStatus: () => request<SystemStatus>('/api/system/status'),
   audit: () => request<AuditEntry[]>('/api/system/audit'),
   models: () =>
-    request<{ recommended: unknown[]; all: unknown[]; notes: string[] }>('/api/models'),
+    request<{
+      recommended: ModelCard[];
+      all: ModelCard[];
+      notes: string[];
+    }>('/api/models'),
 };
 
 /** Bar chart option for a scene template's field/metric counts. */

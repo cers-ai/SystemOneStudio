@@ -290,8 +290,14 @@ class TorchTrainingBackend(TrainingBackend):
             from peft import PeftModel
 
             model = PeftModel.from_pretrained(model, adapter_path)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Refuse loudly. Swallowing this and sampling from the *un-adapted*
+            # base model produced preference pairs from a model that had not been
+            # trained at all, which then fed the next DPO stage.
+            raise TrainingUnavailable(
+                f"无法加载适配器 {adapter_path}：{type(exc).__name__}: {exc}。"
+                "适配器可能损坏，或与当前底座模型不匹配。"
+            ) from exc
         model.eval()
 
         import torch

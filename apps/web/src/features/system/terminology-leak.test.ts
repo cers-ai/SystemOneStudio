@@ -61,6 +61,56 @@ describe('no technical terms in UI source', () => {
   });
 });
 
+describe('no fabricated measurements in UI source', () => {
+  /**
+   * The September audit found the model shelf hardcoding `12GB` / `约 45 分钟`
+   * while `/api/models` was returning the real registry. A figure written into a
+   * component is therefore either fetched or invented, and invented is what this
+   * catches.
+   */
+  const MEASUREMENT = /\d+\s*(GB|MB|毫秒|分钟|小时|秒)/;
+  /** Same pattern, anchored to a quoted literal so fetched values do not match. */
+  const LITERAL = /['"`][^'"`]*\d+\s*(GB|MB|毫秒|分钟|小时|秒)/;
+
+  /** Comments may cite figures to explain a decision; rendered copy may not. */
+  const stripComments = (source: string): string =>
+    source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  const literalLines = (source: string): string[] =>
+    stripComments(source)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => LITERAL.test(line));
+
+  it.each(components)('%s fetches rather than hardcodes measurements', (file) => {
+    const literals = literalLines(readFileSync(file, 'utf8'));
+
+    expect(
+      literals,
+      `${relative(REPO_ROOT, file)} hardcodes a measurement: ${literals.join(' | ')}. ` +
+        'Fetch it from the API, and label it an estimate if it is one.',
+    ).toEqual([]);
+  });
+
+  it('the pattern would catch a real violation', () => {
+    // Guard against the regex silently matching nothing.
+    const bad = ['<span>{"12GB"}</span>', '<span>{"约 45 分钟"}</span>'].join('\n');
+    expect(literalLines(bad)).toHaveLength(2);
+  });
+
+  it('does not flag a value pulled off a response', () => {
+    expect(literalLines('<td>{model.min_gpu_memory}</td>')).toEqual([]);
+  });
+
+  it('measures the units it claims to', () => {
+    for (const sample of ['12GB', '45 分钟', '30 分钟', '512MB', '200 毫秒']) {
+      expect(MEASUREMENT.test(sample), sample).toBe(true);
+    }
+  });
+});
+
 describe('leak detector is meaningful', () => {
   it('catches a realistic regression', () => {
     expect(findTechnicalLeaks('<button>使用 LoRA 训练</button>')).toContain('LoRA');

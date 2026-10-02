@@ -275,7 +275,7 @@
           "models"
         ],
         "summary": "底座模型货架",
-        "description": "Top-3 in-scope recommendations plus the full shelf.\n\nOut-of-scope entries are listed but flagged, so the shelf shows a 7B model as\nunavailable instead of pretending it does not exist. The MVP cap at 1.5B-3B\nis a deliberate answer to limited VRAM (需求方案.txt 13), not an omission.",
+        "description": "Top-3 in-scope recommendations plus the full shelf.\n\nOut-of-scope entries are listed but flagged, so the shelf shows a 7B model as\nunavailable instead of pretending it does not exist. The MVP cap at 1.5B-3B\nis a deliberate answer to limited VRAM (需求方案.txt 13), not an omission.\n\n``min_gpu_memory`` comes from the registry and is an *estimate*, not a\nmeasurement; no duration is produced at all because none has been measured.\nThe UI is expected to show that distinction rather than rendering the number\nas if it were measured.",
         "operationId": "list_models_api_models_get",
         "responses": {
           "200": {
@@ -284,6 +284,71 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelShelfResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{model_id}/plan": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "训练方案与耗时估算",
+        "description": "Computed hyperparameters plus a duration estimate, clearly labelled.\n\n需求方案.txt 5.6 says the advanced values are recommended rather than typed,\nso they have to be *computed* rather than hardcoded in the UI. Every figure\nhere is an estimate; ``measured`` is false and ``basis`` says why.",
+        "operationId": "training_plan_api_models__model_id__plan_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "rows",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10000,
+              "title": "Rows"
+            }
+          },
+          {
+            "name": "qlora",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Qlora"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Training Plan Api Models  Model Id  Plan Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -742,7 +807,7 @@
           "platform"
         ],
         "summary": "审计日志",
-        "description": "变更记录（需求方案.txt 原则 5 可审计）.",
+        "description": "变更记录（需求方案.txt 原则 5 可审计）.\n\n``limit`` is bounded: an unbounded or negative slice returned the *last* N\nentries for a negative limit, which reads as the newest ones.",
         "operationId": "audit_log_api_system_audit_get",
         "parameters": [
           {
@@ -1640,6 +1705,30 @@
             ],
             "title": "Scores"
           },
+          "format_compliant": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Compliant"
+          },
+          "format_total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Total"
+          },
           "contributions": {
             "additionalProperties": {
               "type": "number"
@@ -1691,7 +1780,8 @@
           "y_true",
           "y_pred"
         ],
-        "title": "EvaluationRequest"
+        "title": "EvaluationRequest",
+        "description": "Evaluation input.\n\n``format_compliant`` / ``format_total`` are explicit because 格式合规率 is a\ntracked product indicator (需求方案.txt 14.2). They cannot be inferred from\nthe request: a caller supplying predictions says nothing about whether the\nmodel's raw output parsed. Omit them and the metric reports 未测量."
       },
       "EvaluationResponse": {
         "properties": {
@@ -2805,6 +2895,10 @@
             "type": "number",
             "title": "Black White Ratio"
           },
+          "ratio_computable": {
+            "type": "boolean",
+            "title": "Ratio Computable"
+          },
           "augment_label": {
             "anyOf": [
               {
@@ -2837,6 +2931,7 @@
           "method",
           "total_rows",
           "black_white_ratio",
+          "ratio_computable",
           "augment_label",
           "augment_rows",
           "reasons",

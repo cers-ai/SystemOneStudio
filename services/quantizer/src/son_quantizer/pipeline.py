@@ -210,24 +210,30 @@ def quantize_all(
         destination = output_dir / build_gguf_filename(request.model_version, level)
         result.commands.append(f"llama-quantize {f16_path} -> {destination} [{level.value}]")
         tools.quantize(str(f16_path), str(destination), level)
+        if not destination.exists():
+            # A quantized file that was not actually produced would corrupt every
+            # evaluation run that touched it. Refuse rather than register a claim.
+            raise ToolchainError(f"量化步骤声称成功但产物不存在：{destination}。未登记该产物。")
         result.artifacts.append(
             Artifact(
                 path=str(destination),
                 format=ArtifactFormat.GGUF,
                 quant=level,
-                size_bytes=destination.stat().st_size if destination.exists() else None,
-                sha256=_sha256(destination) if hash_outputs and destination.exists() else None,
+                size_bytes=destination.stat().st_size,
+                sha256=_sha256(destination) if hash_outputs else None,
                 is_recommended=level.value == JEV_BASELINE_QUANT,
             )
         )
 
     if include_native:
         merged = Path(request.merged_path)
+        if not merged.exists():
+            raise ToolchainError(f"合并权重不存在：{request.merged_path}。未登记原生权重产物。")
         result.native_weights = Artifact(
             path=request.merged_path,
             format=ArtifactFormat.NATIVE,
             quant=None,
-            size_bytes=merged.stat().st_size if merged.exists() else None,
+            size_bytes=merged.stat().st_size,
         )
 
     notes: list[str] = []

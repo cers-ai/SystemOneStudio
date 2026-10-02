@@ -139,10 +139,18 @@ export function findStep(id: StepId): WizardStep | undefined {
   return WIZARD_STEPS.find((step) => step.id === id);
 }
 
+/**
+ * Whether a human configures this step in this mode.
+ *
+ * Only rapid mode has a boundary (需求方案.txt 4.1: the user completes steps 1-2
+ * and the rest is automatic). Wizard and expert modes let a person drive every
+ * step, including the evaluate and deploy that follow from step 7 -- the
+ * backend state machine allows exactly that, and restricting it here locked the
+ * primary button on the last two steps with a message reading "由系统自动完成".
+ */
 export function isManualInMode(id: StepId, mode: 'wizard' | 'rapid'): boolean {
-  const index = stepIndex(id);
   if (mode === 'rapid') {
-    return index <= stepIndex(RAPID_MODE_LAST_MANUAL_STEP);
+    return stepIndex(id) <= stepIndex(RAPID_MODE_LAST_MANUAL_STEP);
   }
-  return index < USER_STEP_COUNT;
+  return true;
 }

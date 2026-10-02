@@ -102,7 +102,20 @@ def suggestion_prompt(ctx: ToolContext, *, has_data: bool, has_quality: bool) ->
     screen that already shows where the user is.
     """
     step = ctx.current_step or ""
-    if not ctx.gpu_available and step in {"base_model_selected", "training_configured", "trained"}:
+    if ctx.gpu_available is None and step in {
+        "base_model_selected",
+        "training_configured",
+        "trained",
+    }:
+        return (
+            "我暂时无法确认本节点是否具备图形处理器。需要我帮你确认一下，"
+            "还是你先跑一次 doctor 自检看看？"
+        )
+    if not ctx.gpu_available and step in {
+        "base_model_selected",
+        "training_configured",
+        "trained",
+    }:
         return (
             "本节点没有图形处理器，无法执行训练。你可以继续完成数据治理与样本扩增，"
             "或告诉我训练环节的准备事项——需要我列出把代码部署到 GPU 节点的步骤吗？"

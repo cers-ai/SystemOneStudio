@@ -38,6 +38,7 @@ from son_contracts import (
     Lineage,
     QuantLevel,
     RunState,
+    TrainingMethod,
 )
 from son_model_registry import REGISTRY_SEED, RegistryModel, mvp_models
 
@@ -61,6 +62,18 @@ class ModelCard(BaseModel):
     license: str
     in_mvp_scope: bool
     adapter_type: str
+
+
+class ModelShelfEntry(ModelCard):
+    """A shelf entry plus the provenance of every number on it.
+
+    ``vram_source`` and ``duration_source`` exist because the shelf is the one
+    screen where a plausible-looking hardcoded number would read as a
+    measurement. The UI renders the source next to the figure.
+    """
+
+    vram_source: str = "registry_estimate"
+    duration_source: str = "unmeasured"
 
 
 class ModelShelfResponse(BaseModel):
@@ -90,16 +103,60 @@ def list_models() -> ModelShelfResponse:
     Out-of-scope entries are listed but flagged, so the shelf shows a 7B model as
     unavailable instead of pretending it does not exist. The MVP cap at 1.5B-3B
     is a deliberate answer to limited VRAM (需求方案.txt 13), not an omission.
+
+    ``min_gpu_memory`` comes from the registry and is an *estimate*, not a
+    measurement; no duration is produced at all because none has been measured.
+    The UI is expected to show that distinction rather than rendering the number
+    as if it were measured.
     """
     in_scope = mvp_models()
     return ModelShelfResponse(
         recommended=[_card(m) for m in in_scope[:3]],
         all=[_card(m) for m in REGISTRY_SEED],
         notes=[
-            "显存需求与预计训练时长需在 GPU 节点实测后填入，本机未验证",
+            "显存需求为注册表中的估算值，未在 GPU 节点实测",
+            "训练时长暂无数据：本机无 GPU，任何时长都未经测量",
             "JEV 兼容等级以实测为准：仓库内的等级为需求文档声明值",
         ],
     )
+
+
+@router.get("/api/models/{model_id}/plan", summary="训练方案与耗时估算")
+def training_plan(
+    model_id: str,
+    rows: int = 10000,
+    qlora: bool = False,
+) -> dict[str, object]:
+    """Computed hyperparameters plus a duration estimate, clearly labelled.
+
+    需求方案.txt 5.6 says the advanced values are recommended rather than typed,
+    so they have to be *computed* rather than hardcoded in the UI. Every figure
+    here is an estimate; ``measured`` is false and ``basis`` says why.
+    """
+    model = next((m for m in REGISTRY_SEED if m.model_id == model_id), None)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"未找到底座模型 {model_id}")
+
+    try:
+        params = float(model.params.rstrip("B"))
+    except ValueError:
+        params = 3.0
+
+    from son_trainer import DatasetProfile, estimate_duration_minutes, recommend_hyperparams
+
+    profile = DatasetProfile(rows=max(rows, 1), params_b=params, quantized=qlora)
+    hyperparams = recommend_hyperparams(profile, (TrainingMethod.SFT, TrainingMethod.DPO))
+
+    return {
+        "model_id": model_id,
+        "hyperparams": hyperparams,
+        "estimated_minutes": estimate_duration_minutes(profile, hyperparams),
+        # Explicit, so no caller can mistake this for a measurement.
+        "measured": False,
+        "basis": ("按数据量与模型规格推算的吞吐估算；尚未在 GPU 节点实测，实际时长可能显著不同"),
+        "vram_estimate": model.min_gpu_memory,
+        "vram_measured": False,
+    }
 
 
 @router.get("/api/models/{model_id}/adapter", summary="适配器可用性")
@@ -181,9 +238,21 @@ def register_model_version(
 
 
 class EvaluationRequest(BaseModel):
+    """Evaluation input.
+
+    ``format_compliant`` / ``format_total`` are explicit because 格式合规率 is a
+    tracked product indicator (需求方案.txt 14.2). They cannot be inferred from
+    the request: a caller supplying predictions says nothing about whether the
+    model's raw output parsed. Omit them and the metric reports 未测量.
+    """
+
     y_true: list[Decision]
     y_pred: list[Decision]
     scores: list[float] | None = None
+    #: Raw model outputs that parsed against the JEV schema. Leave None unless
+    #: measured from an actual inference run.
+    format_compliant: int | None = Field(default=None, ge=0)
+    format_total: int | None = Field(default=None, ge=0)
     contributions: dict[str, float] = Field(default_factory=dict)
     latency_samples: list[LatencySample] = Field(default_factory=list)
     quant_level: QuantLevel = QuantLevel.Q4_K_M
@@ -204,14 +273,18 @@ def _build_effect(request: EvaluationRequest) -> EffectReport:
 
     The evaluator raises ``ValueError`` on a length mismatch; letting that escape
     would surface as a 500, which tells the caller nothing about what to fix.
+
+    Format compliance is passed through as supplied. It used to be computed as
+    ``len(y_true)/len(y_true)``, which certified a hard product metric at 100%
+    for every request regardless of what the model actually emitted.
     """
     try:
         return build_effect_report(
             tuple(request.y_true),
             tuple(request.y_pred),
             scores=tuple(request.scores) if request.scores is not None else None,
-            format_compliant=len(request.y_true),
-            format_total=len(request.y_true),
+            format_compliant=request.format_compliant,
+            format_total=request.format_total,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -263,8 +336,13 @@ def evaluate(request: EvaluationRequest) -> EvaluationResponse:
             "accuracy": round(effect.accuracy, 4),
             "macro_f1": round(effect.macro_f1, 4),
             "auc_roc": effect.auc_roc,
-            "false_kill_rate": round(effect.false_kill_rate, 4),
-            "format_compliance": round(effect.format_compliance, 4),
+            "recall": None if effect.recall is None else round(effect.recall, 4),
+            "false_kill_rate": None
+            if effect.false_kill_rate is None
+            else round(effect.false_kill_rate, 4),
+            "format_compliance": None
+            if effect.format_compliance is None
+            else round(effect.format_compliance, 4),
             "per_label": {k: v.as_dict() for k, v in effect.per_label.items()},
             "confusion": effect.confusion,
             "targets": effect.target_check(),

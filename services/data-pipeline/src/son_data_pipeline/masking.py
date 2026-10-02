@@ -102,14 +102,30 @@ MASKING_RULES: tuple[MaskingRule, ...] = (
 
 @dataclass(frozen=True)
 class MaskingReport:
-    """What was detected and what was masked, per 需求方案.txt 5.3."""
+    """What was detected and what was actually masked, per 需求方案.txt 5.3.
 
+    ``detected_fields`` and ``masked_fields`` are separate. A column that was
+    detected but not present in the frame used to appear in the report as
+    masked, which is a governance claim about a de-identification step that never
+    happened.
+    """
+
+    detected_fields: dict[str, SensitiveKind]
     masked_fields: dict[str, SensitiveKind]
     masked_cells: int
+    skipped_fields: tuple[str, ...]
     rules: tuple[MaskingRule, ...]
 
     def describe(self) -> list[str]:
         return [f"{rule.label}已脱敏" for rule in self.rules]
+
+    def skipped_note(self) -> str | None:
+        if not self.skipped_fields:
+            return None
+        return (
+            f"以下字段被识别为敏感字段但未出现在数据中，未执行脱敏："
+            f"{'、'.join(self.skipped_fields)}"
+        )
 
 
 def detect_sensitive_columns(
@@ -138,11 +154,12 @@ def detect_sensitive_columns(
         if name in detected:
             continue
         series = frame[column].dropna()
-        if len(series) < min_rows_for_value_scan:
+        if len(series) < min_rows_for_value_scan or len(series) == 0:
             continue
         for rule in MASKING_RULES:
-            hits = sum(1 for value in series.head(200) if rule.matches_value(value))
-            if hits / min(len(series), 200) >= value_sample_ratio:
+            probe = series.head(200)
+            hits = sum(1 for value in probe if rule.matches_value(value))
+            if hits / len(probe) >= value_sample_ratio:
                 detected[name] = rule.kind
                 break
 
@@ -160,18 +177,24 @@ def apply_masking(
     masked = frame.copy()
     masked_cells = 0
     applied: list[MaskingRule] = []
+    applied_fields: dict[str, SensitiveKind] = {}
+    skipped: list[str] = []
 
     for column, kind in detected.items():
         if column not in masked.columns:
+            skipped.append(column)
             continue
         rule = rules_by_kind[kind]
         non_null = int(masked[column].notna().sum())
         masked[column] = masked[column].map(rule.mask_value)
         masked_cells += non_null
         applied.append(rule)
+        applied_fields[column] = kind
 
     return masked, MaskingReport(
-        masked_fields=detected,
+        detected_fields=dict(detected),
+        masked_fields=applied_fields,
         masked_cells=masked_cells,
+        skipped_fields=tuple(skipped),
         rules=tuple(applied),
     )

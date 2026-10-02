@@ -83,12 +83,38 @@ class TestFalseKillRate:
         assert false_kill_rate(matrix) == 0.5
 
     def test_killing_gray_is_not_a_false_kill(self) -> None:
-        """误杀 protects normal accounts; rejecting an undecidable sample is not it."""
-        matrix = confusion_matrix((GRAY, GRAY), (BLACK, BLACK))
+        """误杀 protects normal accounts; rejecting an undecidable sample is not it.
+
+        Needs at least one white row: with none, the metric is unmeasured rather
+        than zero, which is the whole point of the None convention.
+        """
+        matrix = confusion_matrix((GRAY, GRAY, WHITE, WHITE), (BLACK, BLACK, WHITE, WHITE))
         assert false_kill_rate(matrix) == 0.0
 
-    def test_no_white_samples_is_zero_not_a_crash(self) -> None:
-        assert false_kill_rate(confusion_matrix((BLACK,), (BLACK,))) == 0.0
+    def test_no_white_samples_is_unmeasured_not_a_pass(self) -> None:
+        """0.0 would be the best possible score for a metric never measured."""
+        assert false_kill_rate(confusion_matrix((BLACK,), (BLACK,))) is None
+
+    def test_unmeasured_false_kill_never_reports_passed(self) -> None:
+        report = build_effect_report((BLACK,), (BLACK,))
+        assert report.false_kill_rate is None
+        assert report.target_check()["false_kill_rate"]["passed"] is None
+
+    def test_no_black_samples_leaves_recall_unmeasured(self) -> None:
+        report = build_effect_report((WHITE, WHITE), (WHITE, WHITE))
+        assert report.recall is None
+        assert report.target_check()["recall"]["passed"] is None
+
+    def test_recall_is_checked_against_its_target(self) -> None:
+        """需求方案.txt 9.2: recall >= 0.85 is a hard indicator."""
+        report = build_effect_report((BLACK, BLACK, WHITE), (BLACK, WHITE, WHITE))
+        checks = report.target_check()
+        assert checks["recall"]["target"] == 0.85
+        assert checks["recall"]["passed"] is False
+
+    def test_recall_passes_when_black_is_fully_caught(self) -> None:
+        report = build_effect_report((BLACK, BLACK, WHITE, WHITE), (BLACK, BLACK, WHITE, BLACK))
+        assert report.target_check()["recall"]["passed"] is True
 
 
 class TestAucRoc:
@@ -138,9 +164,29 @@ class TestEffectReportAssembly:
     def test_format_compliance_is_a_ratio(self) -> None:
         assert self._report().format_compliance == pytest.approx(5 / 6)
 
-    def test_zero_format_samples_is_zero_not_a_division_error(self) -> None:
+    def test_format_compliance_unmeasured_is_none_not_zero(self) -> None:
+        """A fabricated 0.0 or 1.0 would be a number for a check that never ran."""
         report = build_effect_report((BLACK,), (BLACK,))
-        assert report.format_compliance == 0.0
+        assert report.format_compliance is None
+        assert report.target_check()["format_compliance"]["passed"] is None
+
+    def test_format_compliance_uses_supplied_counts(self) -> None:
+        report = build_effect_report(
+            (BLACK, WHITE), (BLACK, WHITE), format_compliant=1, format_total=2
+        )
+        assert report.format_compliance == pytest.approx(0.5)
+        assert report.target_check()["format_compliance"]["passed"] is False
+
+    def test_format_compliance_passes_at_the_target(self) -> None:
+        report = build_effect_report(
+            (BLACK, WHITE), (BLACK, WHITE), format_compliant=100, format_total=100
+        )
+        assert report.target_check()["format_compliance"]["passed"] is True
+
+    def test_no_formula_can_infer_compliance_from_predictions(self) -> None:
+        """Supplying predictions says nothing about whether raw output parsed."""
+        report = build_effect_report((BLACK,) * 50, (BLACK,) * 50)
+        assert report.format_compliance is None
 
     def test_sample_count_is_recorded(self) -> None:
         assert self._report().sample_count == 6

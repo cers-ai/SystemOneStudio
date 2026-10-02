@@ -50,26 +50,46 @@ class FidelityReport:
 
 @dataclass
 class PrivacyReport:
-    """Duplicate and memorisation checks (需求方案.txt 5.4)."""
+    """Duplicate and memorisation checks (需求方案.txt 5.4).
 
-    duplicates_found: int
-    nearest_neighbour_distance: float
+    ``duplicate_check_ran`` and ``nn_check_ran`` exist because a check that
+    could not execute must not render as a green tick. Returning 0 duplicates
+    and a distance of 1.0 -- the best possible values -- produced
+    "✓ 去重检查通过 / ✓ 最近邻距离：平均 1.00（安全）" for a dataset with no
+    comparable columns at all.
+    """
+
+    duplicates_found: int | None
+    nearest_neighbour_distance: float | None
     nn_verdict: NNVerdict
     reversible_risk: RiskLevel
+    duplicate_check_ran: bool = True
+    nn_check_ran: bool = True
     notes: tuple[str, ...] = ()
 
     def describe(self) -> list[str]:
-        clean = self.duplicates_found == 0
-        safe = self.nn_verdict == "safe"
+        if self.duplicate_check_ran:
+            clean = self.duplicates_found == 0
+            dup_line = f"{'✓' if clean else '⚠'} 去重检查" + (
+                "通过" if clean else f"：{self.duplicates_found} 条重复"
+            )
+        else:
+            dup_line = "⚠ 去重检查未执行（没有可对比的字段）"
+
+        if self.nn_check_ran:
+            safe = self.nn_verdict == "safe"
+            nn_line = (
+                f"{'✓' if safe else '⚠'} 最近邻距离：平均 {self.nearest_neighbour_distance:.2f}"
+                f"（{_NN_VERDICT_LABEL[self.nn_verdict]}）"
+            )
+        else:
+            nn_line = "⚠ 最近邻距离未测量（没有可对比的数值字段）"
+
         no_risk = self.reversible_risk == "none"
-        return [
-            f"{'✓' if clean else '⚠'} 去重检查"
-            + ("通过" if clean else f"：{self.duplicates_found} 条重复"),
-            f"{'✓' if safe else '⚠'} 最近邻距离：平均 {self.nearest_neighbour_distance:.2f}"
-            f"（{'安全' if safe else _NN_VERDICT_LABEL[self.nn_verdict]}）",
-            f"{'✓' if no_risk else '⚠'} "
-            + ("无可逆还原风险" if no_risk else f"可逆风险：{self.reversible_risk}"),
-        ]
+        risk_line = f"{'✓' if no_risk else '⚠'} " + (
+            "无可逆还原风险" if no_risk else f"可逆风险：{self.reversible_risk}"
+        )
+        return [dup_line, nn_line, risk_line]
 
 
 _VERDICT_LABEL: dict[str, str] = {
@@ -133,19 +153,34 @@ def _column_fidelity(seed: pd.Series, synth: pd.Series) -> float:
     return float(max(0.0, 1.0 - min(jsd, 1.0)))
 
 
-def assess_fidelity(seed_frame: pd.DataFrame, synth_frame: pd.DataFrame) -> FidelityReport:
-    """Compare synthetic columns against their seed counterparts."""
+def assess_fidelity(
+    seed_frame: pd.DataFrame,
+    synth_frame: pd.DataFrame,
+    *,
+    label_column: str | None = "label",
+) -> FidelityReport:
+    """Compare synthetic columns against their seed counterparts.
+
+    ``label_column`` is excluded from the feature score. It used to be hardcoded
+    to "label", which meant a dataset whose label column was named ``is_fraud``
+    averaged a perfect label match (1.0) into the score and reported 0.5 for a
+    completely broken feature distribution.
+    """
     shared = [c for c in synth_frame.columns if c in seed_frame.columns and c != "origin"]
     if not shared:
         return FidelityReport(score=0.0, verdict="poor", notes=("没有可对比的字段",))
 
     per_column = {c: _column_fidelity(seed_frame[c], synth_frame[c]) for c in shared}
-    label_column = "label"
-    numeric = [v for c, v in per_column.items() if c != label_column]
-    score = float(np.mean(numeric)) if numeric else float(np.mean(list(per_column.values())))
+    feature_cols = [c for c in per_column if c != label_column]
+    basis = feature_cols or list(per_column)
+    score = float(np.mean([per_column[c] for c in basis]))
 
     notes: list[str] = []
-    weak = [c for c, v in per_column.items() if v < FIDELITY_ACCEPTABLE]
+    if label_column and label_column in per_column:
+        notes.append(
+            f"标签列 {label_column!r} 一致度 {per_column[label_column]:.2f}（未计入特征分布得分）"
+        )
+    weak = [c for c in basis if per_column[c] < FIDELITY_ACCEPTABLE]
     if weak:
         notes.append(f"以下字段分布偏差较大：{', '.join(weak)}")
 
@@ -157,11 +192,15 @@ def assess_fidelity(seed_frame: pd.DataFrame, synth_frame: pd.DataFrame) -> Fide
     )
 
 
-def find_duplicates(seed_frame: pd.DataFrame, synth_frame: pd.DataFrame) -> int:
-    """Count synthetic rows that exactly reproduce a seed row."""
+def find_duplicates(seed_frame: pd.DataFrame, synth_frame: pd.DataFrame) -> int | None:
+    """Count synthetic rows that exactly reproduce a seed row.
+
+    Returns None when there is nothing to compare, which is not the same as
+    "found zero duplicates" -- the caller renders those differently.
+    """
     shared = [c for c in synth_frame.columns if c in seed_frame.columns and c != "origin"]
     if not shared:
-        return 0
+        return None
     seed_keys = {tuple(row) for row in seed_frame[shared].astype(str).to_numpy()}
     synth_keys = [tuple(row) for row in synth_frame[shared].astype(str).to_numpy()]
     return sum(1 for key in synth_keys if key in seed_keys)
@@ -174,12 +213,16 @@ def nearest_neighbour_distance(
     max_rows: int = 500,
     sample: int = 200,
     seed: int = 42,
-) -> float:
+) -> float | None:
     """Mean distance from each synthetic row to its closest seed row.
 
     Small distance means the synthetic row sits almost on top of a real record,
-    which is a memorisation risk rather than a quality win. Normalised per
-    column so unit differences do not dominate.
+    which is a memorisation risk rather than a quality win. Normalised per column
+    so unit differences do not dominate.
+
+    Returns None when it cannot be measured -- no shared numeric columns, or an
+    empty side. It used to return 1.0, which is above the "safe" threshold and
+    therefore reported a clean bill of health for a check that never ran.
     """
     shared = [c for c in synth_frame.columns if c in seed_frame.columns and c != "origin"]
     numeric = [
@@ -189,12 +232,12 @@ def nearest_neighbour_distance(
         and pd.api.types.is_numeric_dtype(synth_frame[c])
     ]
     if not numeric:
-        return 1.0
+        return None
 
     seed_rows = seed_frame[numeric].dropna()
     synth_rows = synth_frame[numeric].dropna()
     if seed_rows.empty or synth_rows.empty:
-        return 1.0
+        return None
 
     if len(seed_rows) > max_rows:
         seed_rows = seed_rows.sample(max_rows, random_state=seed)
@@ -205,9 +248,7 @@ def nearest_neighbour_distance(
     seed_norm = (seed_rows / scales).to_numpy(dtype=float)
     synth_norm = (synth_rows / scales).to_numpy(dtype=float)
 
-    distances = []
-    for row in synth_norm:
-        distances.append(float(np.sqrt(((seed_norm - row) ** 2).sum(axis=1)).min()))
+    distances = [float(np.sqrt(((seed_norm - row) ** 2).sum(axis=1)).min()) for row in synth_norm]
     return float(np.mean(distances))
 
 
@@ -217,34 +258,52 @@ def assess_privacy(
     *,
     seed: int = 42,
 ) -> PrivacyReport:
-    """Run the duplicate and memorisation checks."""
+    """Run the duplicate and memorisation checks.
+
+    A check that could not execute is reported as unexecuted and forces the risk
+    level to at least ``review``; it is never reported as clean.
+    """
     duplicates = find_duplicates(seed_frame, synth_frame)
     distance = nearest_neighbour_distance(seed_frame, synth_frame, seed=seed)
 
-    if distance >= NN_DISTANCE_SAFE:
-        nn_verdict: NNVerdict = "safe"
-    elif distance >= NN_DISTANCE_REVIEW:
+    dup_ran = duplicates is not None
+    nn_ran = distance is not None
+
+    if not nn_ran:
+        nn_verdict: NNVerdict = "poor"
+    elif distance is not None and distance >= NN_DISTANCE_SAFE:
+        nn_verdict = "safe"
+    elif distance is not None and distance >= NN_DISTANCE_REVIEW:
         nn_verdict = "review"
     else:
         nn_verdict = "poor"
 
-    if duplicates == 0 and nn_verdict == "safe":
-        risk: RiskLevel = "none"
-    elif duplicates > 0 or nn_verdict == "poor":
+    duplicates_hit = bool(duplicates)
+    if not dup_ran or not nn_ran:
+        risk: RiskLevel = "review"
+    elif duplicates_hit or nn_verdict == "poor":
         risk = "high"
+    elif nn_verdict == "safe":
+        risk = "none"
     else:
         risk = "review"
 
     notes: list[str] = []
-    if duplicates:
+    if not dup_ran:
+        notes.append("种子数据与合成数据没有可对比的字段，去重检查未执行")
+    if not nn_ran:
+        notes.append("没有可对比的数值字段，最近邻距离未测量")
+    if duplicates_hit:
         notes.append(f"{duplicates} 条合成样本与种子数据完全重复")
-    if nn_verdict != "safe":
+    if nn_ran and nn_verdict != "safe":
         notes.append("合成样本与真实样本过于接近，存在记忆风险")
 
     return PrivacyReport(
         duplicates_found=duplicates,
-        nearest_neighbour_distance=round(distance, 4),
+        nearest_neighbour_distance=None if distance is None else round(distance, 4),
         nn_verdict=nn_verdict,
         reversible_risk=risk,
+        duplicate_check_ran=dup_ran,
+        nn_check_ran=nn_ran,
         notes=tuple(notes),
     )

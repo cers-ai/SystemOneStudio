@@ -183,16 +183,54 @@ class TestPromptAssembly:
 
 
 class TestTiming:
-    def test_a_sample_is_recorded_per_request(self) -> None:
+    def test_unmeasured_requests_are_not_recorded(self) -> None:
+        """An unmeasured request must not become a 0ms sample.
+
+        Ten such samples alongside two real 97ms ones reported a P50 of 0ms,
+        which would pass the 50ms target on a run that never happened.
+        """
         service = PredictionService(engine=StubEngine())
         service.predict(PredictRequest(account="A1"))
         service.predict(PredictRequest(account="A2"))
+        assert service.measured_samples() == []
+
+    def test_measured_requests_are_recorded(self) -> None:
+        service = PredictionService(engine=StubEngine())
+        service.predict(PredictRequest(account="A1"), measure=True)
+        service.predict(PredictRequest(account="A2"), measure=True)
         assert len(service.measured_samples()) == 2
+        assert all(s.total_ms > 0 for s in service.measured_samples())
+
+    def test_unmeasured_prediction_is_flagged(self) -> None:
+        result = PredictionService(engine=StubEngine()).predict(PredictRequest(account="A1"))
+        assert result.measured is False
+        assert "未计时" in result.describe()
+
+    def test_measured_prediction_is_flagged(self) -> None:
+        result = PredictionService(engine=StubEngine()).predict(
+            PredictRequest(account="A1"), measure=True
+        )
+        assert result.measured is True
 
     def test_ttft_is_not_faked_from_total(self) -> None:
-        """Equating TTFT with total would double-count one number as two metrics."""
-        result = PredictionService(engine=StubEngine()).predict(PredictRequest(account="A1"))
+        """Equating TTFT with the total would double-count one number as two."""
+        result = PredictionService(engine=StubEngine()).predict(
+            PredictRequest(account="A1"), measure=True
+        )
         assert result.latency.ttft_ms is None
+
+    def test_engine_ttft_is_preferred_when_available(self) -> None:
+        class TimedEngine(StubEngine):
+            def complete_timed(
+                self, prompt: str, *, grammar: str | None = None, max_tokens: int = 256
+            ) -> tuple[str, float, float]:
+                return GOOD, 90.0, 12.0
+
+        result = PredictionService(engine=TimedEngine()).predict(
+            PredictRequest(account="A1"), measure=True
+        )
+        assert result.latency.ttft_ms == 12.0
+        assert result.latency.total_ms == 90.0
 
 
 class TestServerCommand:

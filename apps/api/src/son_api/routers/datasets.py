@@ -70,6 +70,7 @@ class SynthRecommendationResponse(BaseModel):
     method: str
     total_rows: int
     black_white_ratio: float
+    ratio_computable: bool
     augment_label: str | None
     augment_rows: int
     reasons: list[str]
@@ -114,11 +115,11 @@ async def preview(upload: UploadFile) -> PreviewResponse:
     frame = pd.DataFrame(records)
 
     detection = detect_label_column(frame)
-    counts = (
-        label_counts(frame, detection.column, detection.mapping)
-        if detection.column
-        else {d.value: 0 for d in Decision}
-    )
+    # None means no usable label column; fall back to zeros so the
+    # response shape stays stable.
+    counts = label_counts(frame, detection.column, detection.mapping) or {
+        d.value: 0 for d in Decision
+    }
 
     from son_data_pipeline.masking import detect_sensitive_columns
 
@@ -147,11 +148,11 @@ async def quality(upload: UploadFile) -> QualityResponse:
 
     frame = pd.DataFrame(_read_upload(upload))
     detection = detect_label_column(frame)
-    counts = (
-        label_counts(frame, detection.column, detection.mapping)
-        if detection.column
-        else {d.value: 0 for d in Decision}
-    )
+    # None means no usable label column; fall back to zeros so the
+    # response shape stays stable.
+    counts = label_counts(frame, detection.column, detection.mapping) or {
+        d.value: 0 for d in Decision
+    }
 
     masked, masking_report = apply_masking(frame)
     report = build_report(masked, counts, masked_fields=tuple(masking_report.masked_fields))
@@ -209,17 +210,18 @@ async def recommend_synth(upload: UploadFile) -> SynthRecommendationResponse:
 
     frame = pd.DataFrame(_read_upload(upload))
     detection = detect_label_column(frame)
-    counts = (
-        label_counts(frame, detection.column, detection.mapping)
-        if detection.column
-        else {d.value: 0 for d in Decision}
-    )
+    # None means no usable label column; fall back to zeros so the
+    # response shape stays stable.
+    counts = label_counts(frame, detection.column, detection.mapping) or {
+        d.value: 0 for d in Decision
+    }
 
     recommendation = recommend(counts, seed_rows=len(frame))
     return SynthRecommendationResponse(
         method=recommendation.method.value,
         total_rows=recommendation.total_rows,
         black_white_ratio=recommendation.black_white_ratio,
+        ratio_computable=recommendation.ratio_computable,
         augment_label=recommendation.augment_label.value if recommendation.augment_label else None,
         augment_rows=recommendation.augment_rows,
         reasons=list(recommendation.reasons),

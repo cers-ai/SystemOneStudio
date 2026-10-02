@@ -28,7 +28,12 @@ MIN_SEED_ROWS_FOR_AUGMENT = 20
 
 @dataclass(frozen=True)
 class SynthRecommendation:
-    """Pre-filled synthesis parameters (需求方案.txt 5.4)."""
+    """Pre-filled synthesis parameters (需求方案.txt 5.4).
+
+    ``black_white_ratio`` is 0.0 when it cannot be computed, i.e. one of the two
+    classes is absent. The API returns it as ``ratio_computable: false`` so the
+    UI can say so rather than rendering "1 : 1".
+    """
 
     method: SynthMethod
     total_rows: int
@@ -37,7 +42,16 @@ class SynthRecommendation:
     augment_rows: int
     reasons: tuple[str, ...]
 
+    @property
+    def ratio_computable(self) -> bool:
+        return self.black_white_ratio > 0
+
     def describe(self) -> str:
+        if not self.ratio_computable:
+            return (
+                f"{self.method.value} | 合成总量 {self.total_rows:,} | "
+                "黑白比例不可比（缺少其中一类样本）"
+            )
         ratio = (
             f"{self.black_white_ratio:.0f} : 1"
             if self.black_white_ratio >= 1
@@ -49,17 +63,21 @@ class SynthRecommendation:
         )
 
 
-def recommend_ratio(counts: dict[str, int]) -> float:
+def recommend_ratio(counts: dict[str, int]) -> float | None:
     """Recommended black:white ratio for the augmented dataset.
 
     Expresses the larger class over the smaller one, so it is always >= 1. Gray
     is excluded: it is a separate outcome and scaling it by the black/white
     imbalance would be meaningless.
+
+    Returns None when either class is absent. Returning 1.0 there would mean
+    "perfectly balanced", and the caller would then emit the reason string
+    "黑白样本已均衡" for a dataset that is 100% black.
     """
     black = counts.get(Decision.BLACK.value, 0)
     white = counts.get(Decision.WHITE.value, 0)
     if black == 0 or white == 0:
-        return 1.0
+        return None
     return max(1.0, min(max(black, white) / min(black, white), MAX_RECOMMENDED_RATIO))
 
 
@@ -77,11 +95,27 @@ def recommend(
     gray = counts.get(Decision.GRAY.value, 0)
 
     ratio = recommend_ratio(counts)
-    minority_label = Decision.WHITE if white < black else Decision.BLACK
 
+    if ratio is None:
+        # One class missing is not "balanced"; it is an unusable recommendation.
+        missing = "白样本" if black else "黑样本"
+        return SynthRecommendation(
+            method=SynthMethod.DISTRIBUTION_FIT,
+            total_rows=target_total or max(seed_rows, SUFFICIENT_SEED_ROWS),
+            black_white_ratio=0.0,
+            augment_label=None,
+            augment_rows=0,
+            reasons=(
+                f"种子数据缺少{missing}，无法给出黑白比例建议；请补充该类样本后再进行定向扩增",
+            ),
+        )
+
+    minority_label = Decision.WHITE if white < black else Decision.BLACK
     minority_rows = min(black, white)
+
+    augment_label: Decision | None
     if ratio <= 1.5:
-        augment_label: Decision | None = None
+        augment_label = None
         reasons.append("黑白样本已均衡，无需定向扩增")
     elif minority_rows < MIN_SEED_ROWS_FOR_AUGMENT:
         augment_label = None

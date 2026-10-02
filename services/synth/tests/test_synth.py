@@ -214,7 +214,7 @@ class TestPrivacy:
 
     def test_copied_rows_raise_the_risk_level(self, seed_frame: pd.DataFrame) -> None:
         report = assess_privacy(seed_frame, seed_frame.head(20).copy())
-        assert report.duplicates_found > 0
+        assert (report.duplicates_found or 0) > 0
         assert report.reversible_risk == "high"
 
     def test_privacy_report_lines_match_requirement_5_4(self, seed_frame: pd.DataFrame) -> None:
@@ -225,19 +225,53 @@ class TestPrivacy:
 
     def test_nearest_neighbour_distance_is_positive(self, seed_frame: pd.DataFrame) -> None:
         frame = synthesize(seed_frame, _request()).frame
-        assert nearest_neighbour_distance(seed_frame, frame) > 0
+        distance = nearest_neighbour_distance(seed_frame, frame)
+        assert distance is not None
+        assert distance > 0
 
     def test_verbatim_copies_sit_far_closer_than_independent_rows(
         self, seed_frame: pd.DataFrame
     ) -> None:
         independent = synthesize(seed_frame, _request(target_rows=50)).frame
         verbatim = seed_frame.head(50).copy()
-        assert nearest_neighbour_distance(seed_frame, verbatim) < nearest_neighbour_distance(
-            seed_frame, independent
-        )
+        near_verbatim = nearest_neighbour_distance(seed_frame, verbatim)
+        near_independent = nearest_neighbour_distance(seed_frame, independent)
+        assert near_verbatim is not None and near_independent is not None
+        assert near_verbatim < near_independent
 
-    def test_no_numeric_columns_is_not_a_crash(self, seed_frame: pd.DataFrame) -> None:
-        assert nearest_neighbour_distance(seed_frame, pd.DataFrame({"device": ["ios"]})) == 1.0
+    def test_no_numeric_columns_is_unmeasured_not_safe(self, seed_frame: pd.DataFrame) -> None:
+        """1.0 is above the safe threshold, so returning it claimed a clean check."""
+        assert nearest_neighbour_distance(seed_frame, pd.DataFrame({"device": ["ios"]})) is None
+
+    def test_incomplete_checks_never_report_no_risk(self, seed_frame: pd.DataFrame) -> None:
+        """All-categorical synthetic output: nothing was comparable."""
+        report = assess_privacy(seed_frame[["device", "label"]], seed_frame[["device", "label"]])
+        assert report.duplicate_check_ran is True
+        assert report.nn_check_ran is False
+        assert report.reversible_risk != "none"
+
+    def test_unmeasured_nn_is_spelled_out(self, seed_frame: pd.DataFrame) -> None:
+        """Categorical-only output: the duplicate check ran, the distance did not."""
+        report = assess_privacy(seed_frame[["device", "label"]], seed_frame[["device", "label"]])
+        assert report.duplicate_check_ran is True
+        assert any("未测量" in line for line in report.describe())
+        assert any("最近邻距离" in note for note in report.notes)
+
+    def test_fully_unrun_checks_appear_in_both(self) -> None:
+        report = assess_privacy(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [2]}))
+        lines = report.describe()
+        assert any("未执行" in line for line in lines)
+        assert any("未测量" in line for line in lines)
+
+    def test_no_shared_columns_skips_both_checks(self) -> None:
+        report = assess_privacy(pd.DataFrame({"a": [1]}), pd.DataFrame({"b": [2]}))
+        assert report.duplicate_check_ran is False
+        assert report.nn_check_ran is False
+        assert report.reversible_risk == "review"
+
+    def test_empty_seed_side_is_unmeasured(self) -> None:
+        report = assess_privacy(pd.DataFrame({"amount": []}), pd.DataFrame({"amount": [1.0]}))
+        assert report.nn_check_ran is False
 
 
 class TestFidelityPrivacyIntegration:

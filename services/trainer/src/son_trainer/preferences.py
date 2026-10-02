@@ -108,12 +108,23 @@ def build_preference_pairs(
     pairs: list[PreferencePair] = []
     without_pair = 0
 
-    for index, (prompt, truth, origin) in enumerate(seed_prompts):
-        start = index * n_per_prompt
-        outputs = list(samples[start : start + n_per_prompt])
+    # `samples` is laid out in the order of `prompts` as passed in, with
+    # n_per_prompt entries each. Filtering that list first and then indexing by
+    # the *filtered* position hands every prompt after a skipped row somebody
+    # else's samples -- and since synthetic rows are always skipped and synthetic
+    # rows always land in train, that mis-assignment was the normal case rather
+    # than an edge case. Walking the original list and skipping without moving
+    # the cursor keeps the offset correct.
+    cursor = 0
+    for prompt, truth, origin in prompts:
+        block = samples[cursor : cursor + n_per_prompt]
+        cursor += n_per_prompt
 
-        correct = [o for o in outputs if parse_decision(o) is truth]
-        wrong = [o for o in outputs if parse_decision(o) not in (None, truth)]
+        if origin != DataOrigin.SEED.value:
+            continue
+
+        correct = [o for o in block if parse_decision(o) is truth]
+        wrong = [o for o in block if parse_decision(o) not in (None, truth)]
 
         if not correct or not wrong:
             # Nothing to contrast. A pair built from two samples of the same
@@ -133,11 +144,15 @@ def build_preference_pairs(
             )
         )
 
+    unparsed = sum(1 for s in samples if parse_decision(s) is None)
+
     notes: list[str] = []
     if skipped:
         notes.append(f"跳过 {skipped} 条非种子样本（避免合成数据回流训练）")
     if without_pair:
         notes.append(f"{without_pair} 条样本未生成偏好对（全部判定一致或全部错误）")
+    if unparsed:
+        notes.append(f"{unparsed} 条采样结果无法解析出判定结果，未参与配对")
 
     return PairBuildReport(
         pairs=pairs,

@@ -86,6 +86,16 @@ class SynthResult:
             raise AssertionError("synthetic output contains rows not marked as synthetic")
 
 
+def _complement_label(target: Decision) -> Decision:
+    """The label that fills the remainder when augmenting ``target``.
+
+    Augmenting white complements with black, augmenting black or gray with
+    white. The old expression was ``WHITE if BLACK else BLACK``, so a gray
+    augmentation produced black rows and white was unreachable.
+    """
+    return Decision.BLACK if target is Decision.WHITE else Decision.WHITE
+
+
 class Generator(ABC):
     """Synthesis backend interface. Implement this to swap in SDV/CTGAN/TVAE."""
 
@@ -213,10 +223,17 @@ class GaussianCopulaGenerator(Generator):
             rows[request.label_column] = rng.choice(labels, size=n, p=probs)
             return rows
 
-        if request.target_ratio:
-            # target : other = ratio : 1
+        if request.target_ratio is not None:
+            if request.target_ratio <= 0:
+                # 0:1 means "augment none of the target label", which is never the
+                # intent. Rejected rather than reinterpreted.
+                raise ValueError(
+                    f"target_ratio 必须大于 0，收到 {request.target_ratio}；"
+                    "比例按「目标标签 : 另一类」定义，0 表示不扩增目标标签"
+                )
+            # target : other = ratio : 1, so the complement takes 1/(ratio+1).
             other_rows = round(n / (request.target_ratio + 1))
-            other = Decision.WHITE if target is Decision.BLACK else Decision.BLACK
+            other = _complement_label(target)
             labels = [target.value] * (n - other_rows) + [other.value] * other_rows
         else:
             labels = [target.value] * n
@@ -250,18 +267,40 @@ class FeatureDeriveGenerator(Generator):
             if column in request.categorical_columns:
                 continue
             series = pd.to_numeric(rows[column], errors="coerce")
-            spread = float(pd.to_numeric(seed_frame[column], errors="coerce").std() or 0.0)
+            seed_series = pd.to_numeric(seed_frame[column], errors="coerce")
+            spread = float(seed_series.std() or 0.0)
             if spread == 0:
                 spread = abs(float(series.mean()) or 1.0) * self._default_jitter
-            rows[column] = series * (
-                1 + rng.normal(0, spread * self._default_jitter, size=len(rows))
-            )
+
+            # The multiplier is centred on 1, so its noise is a *relative* scale.
+            # Passing an absolute standard deviation here produced multipliers
+            # from -51x to +55x, i.e. negative and 55x-the-original amounts.
+            rows[column] = series * (1 + rng.normal(0, self._default_jitter, size=len(rows)))
 
         rows = rows.round(6)
+        rows = self.apply_constraints(rows, request.constraints)
+
         if request.augment_label is not None:
             rows[request.label_column] = request.augment_label.value
+        elif request.label_column in seed_frame.columns:
+            # Follow the seed's label distribution. Assigning the (None) augment
+            # label here -- which is what this branch used to do -- produced a
+            # full frame of unlabelled rows that still passed every downstream
+            # check, because only `origin` was ever validated.
+            counts = seed_frame[request.label_column].value_counts(normalize=True)
+            if counts.empty:
+                raise ValueError(
+                    f"种子数据没有 {request.label_column!r} 列，无法确定合成样本的标签"
+                )
+            rows[request.label_column] = rng.choice(
+                list(counts.index), size=len(rows), p=counts.to_numpy(dtype=float)
+            )
         else:
-            rows[request.label_column] = request.augment_label
+            raise ValueError(
+                f"种子数据没有 {request.label_column!r} 列，无法确定合成样本的标签；"
+                "请指定 augment_label"
+            )
+
         rows["origin"] = DataOrigin.SYNTH.value
         return rows
 
@@ -287,9 +326,13 @@ class RuleInjectionGenerator(Generator):
 
         rows = pd.DataFrame(index=range(n))
         for column, spec in self.rules.items():
-            values = spec.get(target.value) or spec.get("default")
-            if values is None:
-                continue
+            values = spec.get(target.value)
+            if not values:
+                # A rule with an empty list for this label is a misconfiguration,
+                # not a reason to fall through to `default` and then index [0].
+                values = spec.get("default")
+            if not values:
+                raise ValueError(f"规则 {column!r} 对 {target.value} 没有取值，且未配置 default")
             options = np.array(values, dtype=object)
             if len(options) > 1:
                 rows[column] = rng.choice(options, size=n)

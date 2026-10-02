@@ -51,38 +51,65 @@ class ClassMetrics:
 
 @dataclass
 class EffectReport:
-    """The second-priority block of an evaluation (需求方案.txt 9.2)."""
+    """The second-priority block of an evaluation (需求方案.txt 9.2).
+
+    Every metric that cannot be computed is ``None`` rather than a number that
+    happens to look good. A metric reported as ``None`` shows up in
+    :meth:`target_check` with ``passed=None``, which the UI renders as 未测量 --
+    never as a pass.
+    """
 
     accuracy: float
     macro_f1: float
+    #: Black-class recall, the 召回率 in 需求方案.txt 9.2 (>= 0.85). None when
+    #: the test set has no black rows.
+    recall: float | None
     auc_roc: float | None
-    false_kill_rate: float
-    format_compliance: float
+    #: None when the test set has no white rows. Reporting 0.0 there would be a
+    #: perfect score for a metric that was never measured.
+    false_kill_rate: float | None
+    #: None when no format-compliance counts were supplied.
+    format_compliance: float | None
     per_label: dict[str, ClassMetrics] = field(default_factory=dict)
     confusion: dict[str, dict[str, int]] = field(default_factory=dict)
     sample_count: int = 0
     notes: tuple[str, ...] = ()
 
-    def target_check(self) -> dict[str, dict[str, float | bool]]:
-        """Metric vs target, so the UI never re-implements the thresholds."""
-        pairs = {
-            "accuracy": (self.accuracy, EFFECT_TARGETS["accuracy"], "min"),
-            "macro_f1": (self.macro_f1, EFFECT_TARGETS["f1"], "min"),
-            "false_kill_rate": (self.false_kill_rate, EFFECT_TARGETS["false_kill_rate"], "max"),
-            "format_compliance": (
-                self.format_compliance,
-                EFFECT_TARGETS["format_compliance"],
-                "min",
-            ),
-        }
-        if self.auc_roc is not None:
-            pairs["auc_roc"] = (self.auc_roc, EFFECT_TARGETS["auc_roc"], "min")
+    def target_check(self) -> dict[str, dict[str, float | bool | None]]:
+        """Metric vs target, so the UI never re-implements the thresholds.
 
-        result: dict[str, dict[str, float | bool]] = {}
-        for name, (value, target, direction) in pairs.items():
-            passed = value >= target if direction == "min" else value <= target
-            result[name] = {"value": round(value, 4), "target": target, "passed": passed}
-        return result
+        ``passed=None`` means unmeasured or undecided -- deliberately distinct
+        from ``True``. 需求方案.txt lists recall as a hard indicator and it must
+        appear here, not just in the per-label breakdown.
+        """
+
+        def entry(
+            value: float | None, target: float, higher_is_better: bool
+        ) -> dict[str, float | bool | None]:
+            passed: bool | None = (
+                None
+                if value is None
+                else (value >= target if higher_is_better else value <= target)
+            )
+            return {
+                "value": None if value is None else round(value, 4),
+                "target": target,
+                "passed": passed,
+            }
+
+        checks: dict[str, dict[str, float | bool | None]] = {
+            "accuracy": entry(self.accuracy, EFFECT_TARGETS["accuracy"], True),
+            "recall": entry(self.recall, EFFECT_TARGETS["recall"], True),
+            "macro_f1": entry(self.macro_f1, EFFECT_TARGETS["f1"], True),
+            "false_kill_rate": entry(
+                self.false_kill_rate, EFFECT_TARGETS["false_kill_rate"], False
+            ),
+            "format_compliance": entry(
+                self.format_compliance, EFFECT_TARGETS["format_compliance"], True
+            ),
+            "auc_roc": entry(self.auc_roc, EFFECT_TARGETS["auc_roc"], True),
+        }
+        return checks
 
 
 def confusion_matrix(
@@ -128,16 +155,31 @@ def accuracy_score(y_true: tuple[Decision, ...], y_pred: tuple[Decision, ...]) -
     return correct / len(y_true)
 
 
-def false_kill_rate(matrix: dict[str, dict[str, int]]) -> float:
+def black_recall(matrix: dict[str, dict[str, int]]) -> float | None:
+    """Recall on the black class -- the 召回率 in 需求方案.txt 9.2.
+
+    Black is the class the product cares about (missed fraud). Returns None when
+    the test set has no black rows, so an empty class cannot read as 0%.
+    """
+    black_total = sum(matrix[Decision.BLACK.value].values())
+    if black_total == 0:
+        return None
+    return matrix[Decision.BLACK.value][Decision.BLACK.value] / black_total
+
+
+def false_kill_rate(matrix: dict[str, dict[str, int]]) -> float | None:
     """Share of ``white`` samples wrongly judged ``black``.
 
     误杀率 in 需求方案.txt 9.2 is a false-positive rate on the white class.
     Killing a gray sample is not counted: gray means "insufficient evidence",
     and rejecting it is not the harm the metric is protecting against.
+
+    Returns None when the test set has no white rows. Returning 0.0 there would
+    be the best possible score for a metric that was never measured.
     """
     white_total = sum(matrix[Decision.WHITE.value].values())
     if white_total == 0:
-        return 0.0
+        return None
     return matrix[Decision.WHITE.value][Decision.BLACK.value] / white_total
 
 
@@ -197,10 +239,16 @@ def build_effect_report(
     y_pred: tuple[Decision, ...],
     *,
     scores: tuple[float, ...] | None = None,
-    format_compliant: int = 0,
-    format_total: int = 0,
+    format_compliant: int | None = None,
+    format_total: int | None = None,
 ) -> EffectReport:
-    """Assemble the whole second-priority block."""
+    """Assemble the whole second-priority block.
+
+    ``format_compliant`` / ``format_total`` default to None, meaning "not
+    measured". A caller must supply real counts: 格式合规率 is a tracked product
+    indicator (需求方案.txt 14.2) and must not be inferred from the fact that
+    predictions were supplied at all.
+    """
     matrix = confusion_matrix(y_true, y_pred)
     per_label = per_label_metrics(matrix)
 
@@ -217,13 +265,29 @@ def build_effect_report(
         if auc is None:
             notes.append("测试集只有单一类别，AUC-ROC 不适用")
 
-    compliance = format_compliant / format_total if format_total else 0.0
+    if format_total is None or format_compliant is None:
+        compliance: float | None = None
+        notes.append("未提供输出格式校验计数，格式合规率未测量")
+    elif format_total <= 0:
+        compliance = None
+        notes.append("输出格式校验样本数为 0，格式合规率未测量")
+    else:
+        compliance = format_compliant / format_total
+
+    recall = black_recall(matrix)
+    if recall is None:
+        notes.append("测试集中没有黑样本，召回率未测量")
+
+    fkr = false_kill_rate(matrix)
+    if fkr is None:
+        notes.append("测试集中没有白样本，误杀率未测量")
 
     return EffectReport(
         accuracy=accuracy_score(y_true, y_pred),
         macro_f1=macro_f1(per_label),
+        recall=recall,
         auc_roc=auc,
-        false_kill_rate=false_kill_rate(matrix),
+        false_kill_rate=fkr,
         format_compliance=compliance,
         per_label=per_label,
         confusion=matrix,

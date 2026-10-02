@@ -108,6 +108,8 @@ export interface Evaluationrequest {
   y_true: unknown[];
   y_pred: unknown[];
   scores?: unknown[] | null;
+  format_compliant?: number | null;
+  format_total?: number | null;
   contributions?: Record<string, unknown>;
   latency_samples?: unknown[];
   quant_level?: Quantlevel;
@@ -352,6 +354,7 @@ export interface Synthrecommendationresponse {
   method: string;
   total_rows: number;
   black_white_ratio: number;
+  ratio_computable: boolean;
   augment_label: string | null;
   augment_rows: number;
   reasons: unknown[];

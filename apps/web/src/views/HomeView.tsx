@@ -42,7 +42,7 @@ export function HomeView({ onNavigate }: { onNavigate: (p: RoutePath) => void })
   return (
     <>
       <section className="hero">
-        <h2 className="hero__title">30 分钟训出可用的决策模型</h2>
+        <h2 className="hero__title">让业务人员自己训出可用的决策模型</h2>
         <p className="hero__lead">
           上传样本数据、选一个场景模板，平台自动完成数据治理、样本扩增、模型训练、
           压缩导出与部署，输出带判定依据的决策模型，并向业务系统提供统一接口。
@@ -60,6 +60,16 @@ export function HomeView({ onNavigate }: { onNavigate: (p: RoutePath) => void })
             直接进入训练流程
           </button>
         </div>
+        {/*
+          需求方案.txt quotes "30 分钟训出可用模型" as the headline and
+          separately lists a several-times-longer training time for a 3B base.
+          Those cannot both hold, so the claim is not printed as a promise;
+          see 技术方案.md Q1.
+        */}
+        <p className="section__hint">
+          需求文档提出「30 分钟训出可用模型」的目标，但同一份文档也给出 3B 底座的
+          训练耗时明显更久，两者尚未对齐，因此此处不作为承诺展示。
+        </p>
       </section>
 
       <section className="section">

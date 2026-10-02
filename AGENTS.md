@@ -77,6 +77,38 @@ deploy/compose        本地依赖编排；deploy/gpu 放 GPU 节点（尚空）
 - **异常检测用修正 z-score 不是 IQR**：需求 5.3 的形状（离群占 31%）会让 q3 落进离群块，IQR 直接失效。
 - **合成器必带 label**：未指定 `augment_label` 时按种子分布采样，不会产出 `None` 标签。
 
+## 审计发现并已修复的"数字不真实"缺陷（2026-10 审查）
+
+以下都是**曾被旧测试断言为正确**的行为，现在一律改为"无法测量就返回未测量"。改动相关代码前先看这些：
+
+| 位置 | 曾返回 | 现返回 |
+|---|---|---|
+| `POST /api/evaluations` 的 `format_compliance` | 恒为 `1.0` / `passed: true`（分子分母都是 `len(y_true)`） | 客户端不提供 `format_compliant/format_total` 时为 `null`，`passed: null` |
+| `son_evaluator.false_kill_rate` | 测试集无白样本时返回 `0.0`（= 满分） | `None` |
+| `son_evaluator.build_effect_report` | 不提供格式计数时 `0.0` | `None`，并附注"未测量" |
+| `EffectReport.target_check` | 从不校验 `recall`（需求 9.2 要求 ≥85%） | 校验，`recall` 缺失时 `passed: null` |
+| `PredictionService.predict` | 未计时请求也 append `LatencySample(0.0)`，污染 P50 | 只有 `measure=True` 才记录；`Prediction.measured` 标志 |
+| `son_synth.privacy.nearest_neighbour_distance` | 无可测数值列时返回 `1.0`（= 最安全）→ 隐私报告三个 ✓ | `None`，报告写"⚠ 未测量"，`reversible_risk` 至少为 `review` |
+| `son_synth.privacy.find_duplicates` | 无可对比字段时返回 `0` | `None` |
+| `son_data_pipeline.recommend_ratio` | 缺黑或缺白时返回 `1.0`（= 已均衡）→ API 说"黑白样本已均衡" | `None`；`SynthRecommendation.ratio_computable=false` |
+| `build_report`（空数据集） | `missing_rate=0.0` → 缺失率"良好" | 返回 `score=0.0` + "数据为空" |
+| `label_counts`（无标签列） | 全零字典，与"真的没有样本"不可区分 | `None` |
+| `MaskingReport` | 跳过的列仍报成"已脱敏" | `detected_fields` / `masked_fields` 分开 + `skipped_note()` |
+| `quantize_all` | 产物文件不存在也登记 `Artifact` | 不存在则 `ToolchainError` |
+| `LlamaServerProcess.stop` | 吞掉信号失败后仍报告"已停止" | 校验进程真的退出，否则抛错 |
+| `StepBody.tsx` 模型货架 | 硬编码 `12GB` / `约 45 分钟` 冒充数据 | 读 `/api/models`；时长显示"未测量"，显存标"估算值" |
+| `HomeView.tsx` 首屏标题 | "30 分钟训出可用的决策模型"（与需求自身矛盾） | 改为不承诺的表述 + 说明冲突 |
+| `DatasetSteps.describeDistribution` | `counts[d]` 为 0 时整个类别消失 | 显式显示 `0 灰` |
+| `flow.ts isManualInMode` | 向导模式误锁第 8、9 步 | 仅极速模式有边界（与后端 `statemachine` 一致） |
+| `AssistantSettings` 探针 | `saveSettings({})` 空 PUT → 测的是旧配置 | 先存表单再测 |
+
+**防回归机制**：`apps/web/src/features/system/terminology-leak.test.ts` 现在同时扫描
+(a) 技术术语泄漏 和 (b) **组件内硬编码的量值**（GB/MB/毫秒/分钟/小时/秒）。
+注释里的数字会被剥离，所以说明性引用不算违规；抓取自响应的值不算违规。
+
+**写新代码时**：任何对外的数字，要么来自 API，要么显式带 `measured: false` 和来源说明。
+"看起来像实测的估算"比"未测量"危险得多。
+
 ## 环境事实（已实测，不要重新假设）
 
 | 项 | 状态 |
@@ -169,4 +201,4 @@ M0–M5 的代码已全部落地并提交（460 Python + 94 TypeScript 测试全
 2. 落实 Q1（P95 口径）与 Q3（JEV 规范），这两项不定案，M3 性能验收与 L2/L3 无法完成
 3. 用真实反诈字段替换 Q4 占位模板
 
-已落地端点：`/health`、`/meta/jev-spec`、`/meta/echo-prediction`、`/api/datasets/{preview,quality,split,recommend-synth,synth}`、`/api/models`、`/api/models/{id}/adapter`、`/api/model-versions`、`/api/evaluations`、`/api/deployments`、`/api/jev/level-claim`。
+已落地端点：`/health`、`/meta/jev-spec`、`/meta/echo-prediction`、`/api/datasets/{preview,quality,split,recommend-synth,synth}`、`/api/models`、`/api/models/{id}/adapter`、`/api/models/{id}/plan`、`/api/model-versions`、`/api/evaluations`、`/api/deployments`、`/api/jev/level-claim`、`/api/scenes/templates`、`/api/scenes`、`/api/scenes/{id}/jev`、`/api/projects`、`/api/system/status`、`/api/system/audit`、`/api/assistant/{settings,settings/probe,providers,tools,preferences,ask,suggest}`。

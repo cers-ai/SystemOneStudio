@@ -191,23 +191,37 @@ STORE = Store()
 
 
 def _to_summary(record: dict[str, Any], template: SceneTemplate | None) -> SceneSummary:
+    """Build the summary, letting a record's own empty values win.
+
+    ``record.get("fields") or [...]`` meant a record storing an empty list fell
+    through to the template's 32 fields, so an operator who cleared the field
+    list still saw 32 reported.
+    """
+    fields = record.get("fields")
+    field_count = (template.field_count if template else 0) if fields is None else len(fields)
+
+    methods = record.get("recommended_methods")
+    if methods is None:
+        methods = template.recommended_methods if template else []
+
+    metrics = record.get("core_metrics")
+    if metrics is None:
+        metrics = template.core_metrics if template else []
+
+    base_model = record.get("recommended_base_model")
+    if not base_model:
+        base_model = template.recommended_base_model if template else ""
+
     return SceneSummary(
         id=str(record["id"]),
         code=str(record["code"]),
         name=str(record["name"]),
         summary=str(record["summary"]),
-        field_count=len(record.get("fields") or []) or (template.field_count if template else 0),
+        field_count=field_count,
         labels=[Decision(d) for d in (record.get("labels") or [])],
-        recommended_base_model=str(
-            record.get("recommended_base_model")
-            or (template.recommended_base_model if template else "")
-        ),
-        recommended_methods=list(
-            record.get("recommended_methods") or (template.recommended_methods if template else [])
-        ),
-        core_metrics=list(
-            record.get("core_metrics") or (template.core_metrics if template else [])
-        ),
+        recommended_base_model=str(base_model),
+        recommended_methods=list(methods),
+        core_metrics=list(metrics),
         jev_format_compat=bool(record["jev_format_compat"]),
         jev_training_compat=bool(record["jev_training_compat"]),
         source=str(record["source"]),
@@ -459,5 +473,10 @@ class AuditEntry(BaseModel):
 
 @router.get("/api/system/audit", response_model=list[AuditEntry], summary="审计日志")
 def audit_log(limit: int = 50) -> list[AuditEntry]:
-    """变更记录（需求方案.txt 原则 5 可审计）."""
-    return [AuditEntry(**e) for e in STORE.audit[:limit]]
+    """变更记录（需求方案.txt 原则 5 可审计）.
+
+    ``limit`` is bounded: an unbounded or negative slice returned the *last* N
+    entries for a negative limit, which reads as the newest ones.
+    """
+    bounded = max(1, min(limit, 200))
+    return [AuditEntry(**e) for e in STORE.audit[:bounded]]

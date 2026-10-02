@@ -100,6 +100,7 @@ class TestLabelColumnDetection:
         frame = pd.DataFrame({"label": ["黑", "白", "灰", "maybe"]})
         mapping = detect_label_column(frame).mapping
         counts = label_counts(frame, "label", mapping)
+        assert counts is not None
         assert sum(counts.values()) == 3
 
 
@@ -182,9 +183,19 @@ class TestSuggestions:
 class TestQualityReport:
     def test_composite_is_bounded(self, seed_frame: pd.DataFrame) -> None:
         mapping = detect_label_column(seed_frame).mapping
-        report = build_report(seed_frame, label_counts(seed_frame, "label", mapping))
+        counts = label_counts(seed_frame, "label", mapping)
+        assert counts is not None
+        report = build_report(seed_frame, counts)
         assert 0.0 <= report.score <= 100.0
         assert report.black_white_ratio == pytest.approx(2.0)
+
+    def test_empty_dataset_reports_nothing_analysed(self) -> None:
+        """An empty upload scored 35 with 缺失率 0.00% / 良好 -- a dimension
+        that was never measured."""
+        report = build_report(pd.DataFrame({"a": []}), {})
+        assert report.score == 0.0
+        assert report.sample_count == 0
+        assert report.suggestions == ["数据为空，请先上传样本数据"]
 
     def test_score_drops_as_the_dataset_gets_worse(self) -> None:
         good = pd.DataFrame([{"amount": 100.0} for _ in range(20_000)])

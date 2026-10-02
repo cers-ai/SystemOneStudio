@@ -498,8 +498,19 @@ const DECISION_LABEL: Record<string, string> = {
 };
 
 function describeDistribution(counts: Record<string, number>): string {
-  const parts = DECISION_ORDER.filter((d) => counts[d]).map((d) => `${counts[d]} ${d[0]?.toUpperCase()}`);
-  return parts.length > 0 ? parts.join(' / ') : '—';
+  // `!== undefined`, not truthiness: a class with genuinely zero rows is falsy
+  // and would vanish from the summary -- and zero gray is exactly the condition
+  // the quality report flags as needing attention.
+  const present = DECISION_ORDER.filter((d) => counts[d] !== undefined);
+  if (present.length === 0) return '未识别到标签列';
+
+  return present
+    .map((d) => {
+      const n = counts[d] ?? 0;
+      const label = { black: '黑', white: '白', gray: '灰' }[d];
+      return n > 0 ? `${n} ${label}` : `0 ${label}`;
+    })
+    .join(' / ');
 }
 
 function verdictLabel(verdict: string): string {

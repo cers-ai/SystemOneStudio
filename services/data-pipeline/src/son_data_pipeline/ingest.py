@@ -235,14 +235,21 @@ def with_origin(
 
 
 def label_counts(
-    frame: pd.DataFrame, label_column: str, mapping: dict[str, Decision]
-) -> dict[str, int]:
-    """Count rows per decision using the detected value mapping."""
+    frame: pd.DataFrame, label_column: str | None, mapping: dict[str, Decision]
+) -> dict[str, int] | None:
+    """Count rows per decision, or None when there is no label column.
+
+    Returning an all-zero dict for a missing column made "no label column"
+    indistinguishable from "every class happens to be empty", and the
+    suggestions layer then reported gray samples as absent as if it had
+    inspected the data.
+    """
+    if not label_column or label_column not in frame.columns:
+        return None
     counts = {d.value: 0 for d in Decision}
-    if label_column not in frame.columns:
-        return counts
     for raw in frame[label_column]:
         decision = mapping.get(str(raw))
         if decision is not None:
             counts[decision.value] += 1
+    return counts
     return counts

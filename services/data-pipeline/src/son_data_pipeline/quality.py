@@ -50,7 +50,15 @@ def volume_score(rows: int) -> tuple[float, str]:
     return score, verdict
 
 
-def completeness_score(missing_rate: float) -> tuple[float, str]:
+def completeness_score(missing_rate: float | None) -> tuple[float, str]:
+    """Completeness verdict.
+
+    ``missing_rate=None`` means "not measurable", which is distinct from 0.0: an
+    empty upload used to score a perfect 1.0 ("良好") for a dimension nobody
+    measured.
+    """
+    if missing_rate is None:
+        return 0.0, "无数据"
     score = max(0.0, 1.0 - missing_rate * 10)
     if missing_rate <= MISSING_GOOD:
         verdict = "良好"
@@ -173,8 +181,22 @@ def build_report(
     """Build the composite quality report for 需求方案.txt 5.3."""
     rows = len(frame)
     cells = frame.size
-    missing_cells = int(frame.isna().sum().sum()) if cells else 0
-    missing_rate = missing_cells / cells if cells else 0.0
+    if rows == 0 or cells == 0:
+        # Nothing to analyse. Report zero rather than a score that reads as if
+        # an analysis had been performed on an empty upload.
+        return QualityReport(
+            score=0.0,
+            sample_count=0,
+            missing_rate=0.0,
+            black_white_ratio=None,
+            label_distribution={},
+            anomalies=[],
+            masked_fields=list(masked_fields),
+            suggestions=["数据为空，请先上传样本数据"],
+        )
+
+    missing_cells = int(frame.isna().sum().sum())
+    missing_rate = missing_cells / cells
 
     v_score, _ = volume_score(rows)
     c_score, _ = completeness_score(missing_rate)

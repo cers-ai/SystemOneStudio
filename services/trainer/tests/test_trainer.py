@@ -373,7 +373,14 @@ class TestDpoStage:
         )
         assert run.stage(TrainingMethod.DPO) is not None
 
-    def test_dpo_is_skipped_when_no_pairs(self, store: LocalCheckpointStore) -> None:
+    def test_dpo_fails_rather_than_vanishing_when_no_pairs(
+        self, store: LocalCheckpointStore
+    ) -> None:
+        """A requested method that cannot run must not disappear.
+
+        It used to be skipped with no StageResult, leaving the run reporting
+        SUCCEEDED with a stage the user explicitly asked for missing.
+        """
         run = run_training(
             _request(
                 methods=(TrainingMethod.SFT, TrainingMethod.DPO),
@@ -383,8 +390,23 @@ class TestDpoStage:
             ScriptedBackend(),
             store=store,
         )
-        assert run.stage(TrainingMethod.DPO) is None
-        assert any("跳过" in note for note in run.notes)
+        dpo = run.stage(TrainingMethod.DPO)
+        assert dpo is not None
+        assert dpo.status == "failed"
+
+    def test_run_cannot_succeed_with_a_failed_stage(self, store: LocalCheckpointStore) -> None:
+        run = run_training(
+            _request(
+                methods=(TrainingMethod.SFT, TrainingMethod.DPO),
+                sampled_outputs=('{"decision":"black"}',) * 24,
+                n_per_prompt=2,
+            ),
+            ScriptedBackend(),
+            store=store,
+        )
+        assert run.state is RunState.FAILED
+        assert run.succeeded is False
+        assert any("未能执行" in note for note in run.notes)
 
     def test_backend_sampling_is_refused_by_default(self, store: LocalCheckpointStore) -> None:
         class NoSampling(TrainingBackend):

@@ -47,12 +47,18 @@ class Prediction:
     """One served request, with the timings tracked separately."""
 
     response: PredictResponse
+    #: Zero-filled when ``measured`` is False. Read ``measured`` before trusting
+    #: anything in here; the placeholder exists to keep the shape stable.
     latency: LatencySample
     raw_completion: str = ""
     notes: tuple[str, ...] = ()
+    #: Whether the latency figures are a real measurement. Never infer this from
+    #: ``latency.total_ms == 0``.
+    measured: bool = False
 
     def describe(self) -> str:
-        return f"{self.response.decision.value} / {self.latency.total_ms:.0f}ms"
+        timing = f"{self.latency.total_ms:.0f}ms" if self.measured else "未计时"
+        return f"{self.response.decision.value} / {timing}"
 
 
 class InferenceEngine(ABC):
@@ -89,6 +95,11 @@ class PredictionService:
         one implementation, and the grammar is attached only when JEV format
         compat is on -- otherwise a non-JEV scene is still constrained to JSON,
         which is not what turning the switch off means.
+
+        Only ``measure=True`` requests contribute to the latency sample list. An
+        unmeasured request used to append ``LatencySample(total_ms=0.0)``, and ten
+        of those alongside two real 97ms samples reported a P50 of 0ms -- which
+        would pass the 50ms target on a run that never happened.
         """
         from son_contracts import JevFlags
 
@@ -97,26 +108,22 @@ class PredictionService:
 
         grammar = build_grammar().grammar if self.jev_format_compat else None
 
-        ttft: float | None = None
-        total = 0.0
-        completion = ""
-
         if measure:
-            total, ttft, completion = self._timed_generate(prompt, grammar)
+            sample, completion = self._measure(prompt, grammar)
+            self.measurements.append(sample)
         else:
             completion = self.engine.complete(prompt, grammar=grammar, max_tokens=self.max_tokens)
-            total = 0.0
+            sample = None
 
         payload = self._coerce(completion, flags)
         response = self._build_response(payload)
 
-        sample = LatencySample(total_ms=total, ttft_ms=ttft)
-        self.measurements.append(sample)
         return Prediction(
             response=response,
-            latency=sample,
+            latency=sample or LatencySample(total_ms=0.0),
             raw_completion=completion,
             notes=self._notes(completion),
+            measured=sample is not None,
         )
 
     def _build_response(self, payload: dict[str, Any]) -> PredictResponse:
@@ -177,20 +184,29 @@ class PredictionService:
             notes.append("输出明显偏长，reason 可能触及长度上限")
         return tuple(notes)
 
-    def _timed_generate(self, prompt: str, grammar: str | None) -> tuple[float, float | None, str]:
-        """Time a generation, separating TTFT from total.
+    def _measure(self, prompt: str, grammar: str | None) -> tuple[LatencySample, str]:
+        """Time one generation, separating TTFT from total.
 
-        The engine interface returns only the final text, so TTFT is unavailable
-        unless the engine reports it. Returning None rather than equating it to
-        the total keeps the two metrics distinguishable instead of quietly
-        double-counting one number.
+        Prefers the engine's own ``complete_timed`` when it exists. The generic
+        ``InferenceEngine`` interface only returns the final text and so cannot
+        observe TTFT; in that case TTFT stays None rather than being substituted
+        with the total, because the two metrics need different optimisations and
+        conflating them hides which one regressed.
         """
         import time
 
+        timed = getattr(self.engine, "complete_timed", None)
+        if callable(timed):
+            completion, total_ms, ttft_ms = timed(
+                prompt, grammar=grammar, max_tokens=self.max_tokens
+            )
+            return LatencySample(total_ms=total_ms, ttft_ms=ttft_ms), completion
+
         start = time.perf_counter()
         completion = self.engine.complete(prompt, grammar=grammar, max_tokens=self.max_tokens)
-        total_ms = (time.perf_counter() - start) * 1000
-        return total_ms, None, completion
+        return LatencySample(
+            total_ms=(time.perf_counter() - start) * 1000, ttft_ms=None
+        ), completion
 
     def measured_samples(self) -> list[LatencySample]:
         return list(self.measurements)

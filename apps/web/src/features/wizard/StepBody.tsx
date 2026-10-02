@@ -1,3 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+
+import { platformApi } from '@/api/platform';
 import { SynthStep, UploadStep } from '@/features/datasets/DatasetSteps';
 import { Term } from '@/components/Term';
 import { findStep, nextStep, type StepId } from './flow';
@@ -166,71 +170,192 @@ function QualityStep() {
   return <UploadStep />;
 }
 
+/**
+ * Base model shelf (需求方案.txt 5.5).
+ *
+ * Reads /api/models rather than carrying its own copy. It used to hardcode four
+ * cards with invented VRAM figures and durations, which meant the screen showed
+ * numbers the platform had never measured and had drifted from the registry.
+ *
+ * No duration is shown at all: none has been measured, and an empty cell is
+ * more honest than an estimate wearing a data table's typography.
+ */
 function ModelShelf() {
+  const models = useQuery({ queryKey: ['models'], queryFn: platformApi.models });
+
+  if (models.isPending) return <div className="empty">加载中…</div>;
+  if (models.isError) {
+    return (
+      <div className="note note--bad">
+        <span className="note__mark">!</span>
+        <span>模型列表加载失败：{models.error.message}</span>
+      </div>
+    );
+  }
+
+  const shelf = models.data;
+  const [showAll, setShowAll] = useState(false);
+  const entries = (shelf?.all ?? []).filter((m) => showAll || m.in_mvp_scope);
+
   return (
     <>
       <p className="card__sub" style={{ marginBottom: 'var(--sp-4)' }}>
-        底座模型全部可插拔。MVP 范围限定在 1.5B–3B，这是为显存不足做的主动取舍，不是遗漏；更大的型号会列出但标记为暂不可选。
+        底座模型全部可插拔。MVP 范围限定在 1.5B–3B，这是为显存不足做的主动取舍，
+        不是遗漏；更大的型号会列出但标记为暂不可选。
       </p>
+
+      <label style={{ fontSize: 'var(--fs-sm)', marginBottom: 'var(--sp-3)' }}>
+        <input
+          type="checkbox"
+          checked={showAll}
+          onChange={(e) => setShowAll(e.target.checked)}
+          style={{ marginRight: 6 }}
+        />
+        显示 MVP 范围外的型号
+      </label>
+
       <div className="grid grid--2">
-        {[
-          { id: 'qwen2.5-3b-instruct', name: 'Qwen2.5-3B-Instruct', vram: '12GB', mins: '约 45 分钟', level: '风格兼容待实测' },
-          { id: 'qwen2.5-1.5b-instruct', name: 'Qwen2.5-1.5B-Instruct', vram: '8GB', mins: '约 25 分钟', level: '风格兼容待实测' },
-          { id: 'gemma-2-2b-it', name: 'Gemma 2 2B-it', vram: '8GB', mins: '约 30 分钟', level: '格式兼容 L1' },
-          { id: 'son-tabular-classifier-lt1b', name: '轻量表格分类器 <1B', vram: '4GB', mins: '约 10 分钟', level: '格式兼容 L1' },
-        ].map((m) => (
-          <div className="card" key={m.id}>
-            <div className="card__title">{m.name}</div>
+        {entries.map((model) => (
+          <div className="card" key={model.model_id}>
+            <div className="card__title">
+              {model.display_name}
+              {!model.in_mvp_scope ? (
+                <span className="badge badge--neutral">范围外</span>
+              ) : null}
+            </div>
             <div className="kv">
+              <dt>规格</dt>
+              <dd>{model.params}</dd>
               <dt>显存需求</dt>
-              <dd>{m.vram}</dd>
-              <dt>预计时长</dt>
-              <dd>{m.mins}</dd>
+              <dd>
+                {model.min_gpu_memory}
+                <span className="badge badge--warn" style={{ marginLeft: 6 }}>
+                  估算值
+                </span>
+              </dd>
+              <dt>训练时长</dt>
+              <dd>
+                <span style={{ color: 'var(--c-text-tertiary)' }}>未测量</span>
+              </dd>
               <dt>输出规范兼容度</dt>
-              <dd>{m.level}</dd>
+              <dd>
+                {model.jev_compat_level ? (
+                  <span className="badge badge--neutral">{model.jev_compat_level}</span>
+                ) : (
+                  <span className="badge badge--warn">待实测</span>
+                )}
+              </dd>
+              <dt>许可</dt>
+              <dd>{model.license}</dd>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="note note--warn" style={{ marginTop: 'var(--sp-4)' }}>
-        <span className="note__mark">!</span>
-        <span>
-          显存需求与训练时长为经验估算，尚未在 GPU 节点实测；「风格兼容」等级需要对比测试报告才能声明，目前无任何底座已通过该验证。
-        </span>
-      </div>
+      {(shelf?.notes ?? []).map((note) => (
+        <div className="note note--warn" key={note} style={{ marginTop: 'var(--sp-3)' }}>
+          <span className="note__mark">!</span>
+          <span>{note}</span>
+        </div>
+      ))}
     </>
   );
 }
 
+const TRAINING_MODES = [
+  {
+    key: 'rapid',
+    name: '快速模式',
+    desc: '决策风格适配 + 决策优化训练',
+    recommended: true,
+  },
+  { key: 'fine', name: '精细模式', desc: '全量微调 + 压缩感知训练', recommended: false },
+  { key: 'distill', name: '蒸馏模式', desc: '大模型能力迁移到小模型', recommended: false },
+] as const;
+
+/**
+ * Training configuration (需求方案.txt 5.6).
+ *
+ * Durations and VRAM are read from /api/models/{id}/plan, which *computes* them
+ * from the dataset size and model spec per principle 2. They used to be
+ * hardcoded here, which duplicated the registry and invented numbers the
+ * platform had never measured.
+ */
 function TrainingConfig() {
+  const plans = useQuery({
+    queryKey: ['training-plans'],
+    queryFn: async () => {
+      const ids = ['qwen2.5-3b-instruct', 'qwen2.5-1.5b-instruct', 'gemma-2-2b-it'];
+      const results = await Promise.all(
+        ids.map((id) => fetch(`/api/models/${id}/plan?rows=15000`).then((r) => r.json())),
+      );
+      return results as {
+        model_id: string;
+        estimated_minutes: number;
+        measured: boolean;
+        vram_estimate: string;
+        hyperparams: Record<string, number | string | boolean>;
+      }[];
+    },
+  });
+
   return (
     <>
       <div className="card__title" style={{ marginBottom: 'var(--sp-3)' }}>
         训练模式
       </div>
       <div className="grid grid--3">
-        {[
-          { name: '快速模式', desc: '决策风格适配 + 决策优化训练', mins: '约 45 分钟', vram: '12GB', recommended: true },
-          { name: '精细模式', desc: '全量微调 + 压缩感知训练', mins: '约 3 小时', vram: '40GB', recommended: false },
-          { name: '蒸馏模式', desc: '大模型能力迁移到小模型', mins: '约 2 小时', vram: '24GB', recommended: false },
-        ].map((m) => (
-          <div className="card" key={m.name}>
+        {TRAINING_MODES.map((mode) => (
+          <div className="card" key={mode.key}>
             <div className="card__title">
-              {m.name}
-              {m.recommended ? <span className="badge badge--info">推荐</span> : null}
+              {mode.name}
+              {mode.recommended ? <span className="badge badge--info">推荐</span> : null}
             </div>
             <div className="card__sub" style={{ marginBottom: 'var(--sp-3)' }}>
-              {m.desc}
+              {mode.desc}
             </div>
-            <div className="kv">
-              <dt>预计时长</dt>
-              <dd>{m.mins}</dd>
-              <dt>显存</dt>
-              <dd>{m.vram}</dd>
+            <div className="row-item__meta">
+              时长与显存随所选底座模型变化，见下方「推荐配置」
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--sp-4)' }}>
+        <div className="card__title">推荐配置</div>
+        <div className="card__sub">
+          由系统按数据量与模型规格计算（原则 2：能不动就不动）。
+          时长为推算估算，非实测。
+        </div>
+
+        {plans.isPending ? <div className="empty">计算中…</div> : null}
+
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">底座模型</th>
+                <th scope="col">显存（估算）</th>
+                <th scope="col">时长（估算）</th>
+                <th scope="col">学习率</th>
+                <th scope="col">批次</th>
+                <th scope="col">步数</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(plans.data ?? []).map((plan) => (
+                <tr key={plan.model_id}>
+                  <td>{plan.model_id}</td>
+                  <td>{plan.vram_estimate}</td>
+                  <td>约 {Math.round(plan.estimated_minutes)} 分钟</td>
+                  <td>{String(plan.hyperparams.learning_rate)}</td>
+                  <td>{String(plan.hyperparams.batch_size)}</td>
+                  <td>{String(plan.hyperparams.max_steps)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <details className="card" style={{ marginTop: 'var(--sp-4)' }}>
@@ -238,7 +363,7 @@ function TrainingConfig() {
           高级设置（默认折叠，业务人员无需改动）
         </summary>
         <div className="card__sub" style={{ marginTop: 'var(--sp-3)' }}>
-          学习率、批次大小与迭代步数由系统按数据量与模型规模计算得出（原则 2：能不动就不动）。
+          学习率、批次大小与迭代步数由系统按数据量与模型规模计算得出。
         </div>
         <div className="kv">
           <dt>
@@ -259,7 +384,8 @@ function TrainingConfig() {
       <div className="note note--warn" style={{ marginTop: 'var(--sp-4)' }}>
         <span className="note__mark">!</span>
         <span>
-          训练需要 NVIDIA GPU。本机没有 GPU，也没有安装训练依赖，因此本步骤的时长与显存均为估算值，未经验证。
+          上表时长与显存均为推算估算，未经 GPU 实测。训练需要 NVIDIA GPU，
+          本机没有 GPU，因此没有任何一个数字来自真实运行。
         </span>
       </div>
     </>

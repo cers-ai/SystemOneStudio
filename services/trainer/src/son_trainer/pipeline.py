@@ -167,7 +167,18 @@ def run_training(
                 return run
             if pair_report.size == 0:
                 notes.extend(pair_report.notes)
-                notes.append("无可用偏好对，跳过决策优化训练")
+                # Requested but impossible to run. Recorded as a failed stage so
+                # the run cannot finish SUCCEEDED while silently omitting a
+                # method the user explicitly asked for (需求方案.txt 8.2).
+                notes.append("无可用偏好对，决策优化训练未能执行")
+                run.stages.append(
+                    StageResult(
+                        stage=TrainingMethod.DPO.value,
+                        status="failed",
+                        step=0,
+                        notes=tuple(pair_report.notes),
+                    )
+                )
                 continue
             stage_samples = tuple(to_train_samples(pair_report.pairs))
         else:
@@ -252,9 +263,15 @@ def _build_pairs(
     that is missing a method the user explicitly asked for (需求方案.txt 8.2
     lists DPO as a core JEV-paradigm method).
     """
-    # Ground truth comes from the supervised sample's own response, which was
-    # rendered from the dataset label.
-    prompts = tuple((s.prompt, _label_of(s), s.origin) for s in request.samples)
+    labelled = [(s.prompt, _label_of(s), s.origin) for s in request.samples]
+    unlabelled = sum(1 for _, label, _ in labelled if label is None)
+    prompts = tuple((p, label, origin) for p, label, origin in labelled if label is not None)
+
+    if not prompts:
+        raise RuntimeError(
+            f"全部 {unlabelled} 条训练样本都无法解析出标签，无法判断采样输出是否正确；"
+            "请检查训练目标的输出格式"
+        )
 
     if request.sampled_outputs is not None:
         samples = request.sampled_outputs
@@ -277,7 +294,12 @@ def _build_pairs(
     return build_preference_pairs(prompts, samples, n_per_prompt=request.n_per_prompt)
 
 
-def _label_of(sample: TrainSample) -> Decision:
-    """Read the ground-truth label a supervised sample was built from."""
-    parsed = parse_decision(sample.response)
-    return parsed if parsed is not None else Decision.BLACK
+def _label_of(sample: TrainSample) -> Decision | None:
+    """Read the ground-truth label a supervised sample was built from.
+
+    Returns None when the response carries no recognizable decision. The caller
+    must then drop the sample: defaulting to BLACK classified every unparseable
+    sample as ground-truth fraud, so genuinely-correct white or gray outputs were
+    fed to DPO as `rejected`.
+    """
+    return parse_decision(sample.response)

@@ -239,16 +239,26 @@ class AskResponse(BaseModel):
 
 
 def _build_context(request: AskRequest | SuggestRequest) -> ToolContext:
-    """Node capabilities come from the platform, not from the client's claim."""
-    gpu: bool | None = None
+    """Node capabilities come from the platform, not from the client's claim.
+
+    A probe failure stays None rather than collapsing to False: turning "could
+    not determine" into "no GPU" makes the assistant tell a GPU node's user they
+    cannot train.
+    """
+    gpu: bool | None
     services: tuple[str, ...] = ("控制面 API",)
     try:
         from son_inference.llamacpp_client import gpu_report
 
-        gpu = bool(gpu_report().get("cuda_available"))
+        report = gpu_report()
+        gpu = bool(report.get("cuda_available"))
+        if "reason" in report and not gpu:
+            # torch is absent or CUDA is unavailable: genuinely no GPU.
+            gpu = False
         services = ("控制面 API",) + (("训练后端", "推理服务") if gpu else ())
     except Exception:
-        gpu = False
+        gpu = None
+        services = ("控制面 API",)
 
     return ToolContext(
         current_step=request.current_step,

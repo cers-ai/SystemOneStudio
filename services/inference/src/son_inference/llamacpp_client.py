@@ -190,12 +190,25 @@ class LlamaServerProcess:
         return f"http://127.0.0.1:{self.config.port}"
 
     def stop(self, *, timeout: float = 15.0) -> None:
+        """Stop the server, refusing to claim success it cannot verify.
+
+        Used to swallow every signal failure and then set ``process = None``, so
+        ``running`` reported False while the child still held port 8080 -- and
+        the CLI printed "服务已停止" regardless.
+        """
         if self.process is None:
             return
-        self._signal(signal.SIGTERM, timeout)
-        if self.process is not None:
-            self._signal(_SIGKILL, timeout)
+        process = self.process
         self.process = None
+        self._signal(signal.SIGTERM, timeout)
+        if process.poll() is None:
+            self._signal(_SIGKILL, timeout)
+        process.wait(timeout=timeout)
+        if process.poll() is None:
+            raise LlamaCppUnavailable(
+                f"推理服务未在 {timeout}s 内退出（pid {process.pid}），"
+                f"可能仍占用端口 {self.config.port}。请手动确认。"
+            )
 
     def _signal(self, sig: int, timeout: float) -> None:
         """Signal the process group where the platform allows it.
@@ -208,9 +221,8 @@ class LlamaServerProcess:
         process = self.process
         if process is None:
             return
-        posix = hasattr(os, "killpg") and hasattr(os, "getpgid")
         try:
-            if posix:
+            if hasattr(os, "killpg") and hasattr(os, "getpgid"):
                 os.killpg(os.getpgid(process.pid), sig)  # type: ignore[attr-defined]
             elif sig == _SIGKILL:
                 process.kill()

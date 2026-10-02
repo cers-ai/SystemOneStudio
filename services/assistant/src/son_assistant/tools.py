@@ -57,7 +57,22 @@ class Tool:
 
 
 def _node_capabilities(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
-    """What this deployment can actually run right now."""
+    """What this deployment can actually run right now.
+
+    ``gpu_available`` is tri-state on purpose. None means the probe failed, which
+    is different from "no GPU"; reporting a failed probe as a confident absence
+    makes the assistant tell a GPU node's user they cannot train.
+    """
+    if ctx.gpu_available is None:
+        return {
+            "gpu_available": None,
+            "available_services": list(ctx.available_services),
+            "implication": (
+                "无法确定本节点的图形处理器状态（探测失败）。"
+                "请让用户确认，或运行 python -m son_cli doctor。"
+                "在确认之前，不要断言训练可行或不可行。"
+            ),
+        }
     return {
         "gpu_available": ctx.gpu_available,
         "available_services": list(ctx.available_services),
