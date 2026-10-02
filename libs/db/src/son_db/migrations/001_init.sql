@@ -115,6 +115,9 @@ CREATE INDEX IF NOT EXISTS idx_synth_run ON synth_runs(run_id);
 
 CREATE TABLE IF NOT EXISTS jobs (
     id              TEXT PRIMARY KEY,
+    -- Monotonic insertion counter. FIFO order cannot depend on created_at:
+    -- two jobs enqueued in the same millisecond would tie.
+    seq             INTEGER,
     run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
 
     type            TEXT NOT NULL,

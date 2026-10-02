@@ -60,14 +60,15 @@ def workspace() -> Path:
 
 
 def now_iso() -> str:
-    """UTC timestamp as ISO-8601 with a trailing Z.
+    """UTC timestamp as ISO-8601 with milliseconds.
 
-    Used as the column default for every created_at / updated_at, so timestamps
-    are uniform across all eleven tables rather than per-model.
+    Millisecond precision because the job queue orders by ``created_at``: with
+    second precision two jobs enqueued in the same second tie, and FIFO order
+    becomes arbitrary.
     """
     from datetime import UTC, datetime
 
-    return datetime.now(UTC).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
 class Base(DeclarativeBase):

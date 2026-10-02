@@ -179,6 +179,10 @@ class JobRow(Base):
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("job"))
+    #: Monotonic insertion counter, assigned by ``enqueue``. It is what makes the
+    #: queue FIFO independent of clock resolution: two jobs enqueued in the same
+    #: millisecond would otherwise tie on created_at.
+    seq: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     run_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("runs.id", ondelete="CASCADE"), nullable=False
     )

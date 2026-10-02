@@ -35,6 +35,12 @@ from son_trainer.preferences import (
     parse_decision,
     to_train_samples,
 )
+from son_trainer.torch_backend import (
+    TorchRunConfig,
+    TorchTrainingBackend,
+    TrainingUnavailable,
+    assert_training_available,
+)
 
 __all__ = [
     "Checkpoint",
@@ -46,10 +52,14 @@ __all__ = [
     "PreferencePair",
     "StageRequest",
     "StageResult",
+    "TorchRunConfig",
+    "TorchTrainingBackend",
     "TrainRequest",
     "TrainRun",
     "TrainSample",
     "TrainingBackend",
+    "TrainingUnavailable",
+    "assert_training_available",
     "build_preference_pairs",
     "estimate_duration_minutes",
     "parse_decision",

@@ -55,6 +55,9 @@ class SynthRequest:
     target_rows: int
     method: SynthMethod = SynthMethod.DISTRIBUTION_FIT
     label_column: str = "label"
+    #: Column holding the row-level origin stamp. The split guard and the data
+    #: quality report both read it, so it is configurable rather than assumed.
+    origin_column: str = "origin"
     feature_columns: tuple[str, ...] = ()
     categorical_columns: tuple[str, ...] = ()
     target_ratio: float | None = None
@@ -65,7 +68,7 @@ class SynthRequest:
     def resolved_features(self, frame: pd.DataFrame) -> list[str]:
         if self.feature_columns:
             return list(self.feature_columns)
-        return [c for c in frame.columns if c not in (self.label_column, "origin")]
+        return [c for c in frame.columns if c not in (self.label_column, self.origin_column)]
 
 
 @dataclass
@@ -78,11 +81,11 @@ class SynthResult:
     label_counts: dict[str, int]
     notes: tuple[str, ...] = field(default_factory=tuple)
 
-    def assert_synthetic(self) -> None:
+    def assert_synthetic(self, origin_column: str = "origin") -> None:
         """Every generated row must be stamped, or the split guard is bypassable."""
-        if "origin" not in self.frame.columns:
-            raise AssertionError("synthetic output must carry an origin column")
-        if not (self.frame["origin"] == DataOrigin.SYNTH.value).all():
+        if origin_column not in self.frame.columns:
+            raise AssertionError(f"synthetic output must carry a {origin_column!r} column")
+        if not (self.frame[origin_column] == DataOrigin.SYNTH.value).all():
             raise AssertionError("synthetic output contains rows not marked as synthetic")
 
 
@@ -146,7 +149,7 @@ class GaussianCopulaGenerator(Generator):
         rows = self.apply_constraints(rows, request.constraints)
         rows = self._apply_label_target(rows, request, seed_frame)
 
-        rows["origin"] = DataOrigin.SYNTH.value
+        rows[request.origin_column] = DataOrigin.SYNTH.value
         return rows
 
     def _sample_rows(
@@ -301,7 +304,7 @@ class FeatureDeriveGenerator(Generator):
                 "请指定 augment_label"
             )
 
-        rows["origin"] = DataOrigin.SYNTH.value
+        rows[request.origin_column] = DataOrigin.SYNTH.value
         return rows
 
 
@@ -343,7 +346,7 @@ class RuleInjectionGenerator(Generator):
             rows[request.label_column] = target.value
 
         rows = self.apply_constraints(rows, request.constraints)
-        rows["origin"] = DataOrigin.SYNTH.value
+        rows[request.origin_column] = DataOrigin.SYNTH.value
         return rows
 
 
@@ -393,5 +396,5 @@ def synthesize(
         label_counts=counts,
         notes=(f"backend={type(backend).__name__}",),
     )
-    result.assert_synthetic()
+    result.assert_synthetic(request.origin_column)
     return result

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "son-worker"
+version = "0.1.0"
+description = "Local job worker: data prep, synth, train, merge, quantize, evaluate, deploy."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "son-contracts",
+  "son-db",
+  "son-data-pipeline",
+  "son-evaluator",
+  "son-inference",
+  "son-jev-adapter",
+  "son-orchestrator",
+  "son-quantizer",
+  "son-synth",
+  "son-trainer",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/son_worker"]
+
+[tool.uv.sources]
+son-contracts = { workspace = true }
+son-db = { workspace = true }
+son-data-pipeline = { workspace = true }
+son-evaluator = { workspace = true }
+son-inference = { workspace = true }
+son-jev-adapter = { workspace = true }
+son-orchestrator = { workspace = true }
+son-quantizer = { workspace = true }
+son-synth = { workspace = true }
+son-trainer = { workspace = true }

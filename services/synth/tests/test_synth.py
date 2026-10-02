@@ -66,7 +66,7 @@ class TestProvenanceStamping:
 
     def test_missing_column_is_caught(self, seed_frame: pd.DataFrame) -> None:
         result = synthesize(seed_frame, _request())
-        with pytest.raises(AssertionError, match="origin column"):
+        with pytest.raises(AssertionError, match="origin"):
             type(result)(
                 frame=result.frame.drop(columns=["origin"]),
                 method=result.method,
