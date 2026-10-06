@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-06",
+  "scope": "current working tree; isolated temporary databases; no GPU execution",
+  "checks": {"typescript_tests_passed": 101, "python_tests_passed": 877, "python_tests_skipped": 1, "python_warnings": 1, "frontend_build": "passed"},
+  "observations": {
+    "upload_formdata_with_json_content_type_status": 422,
+    "upload_formdata_with_multipart_content_type_status": 200,
+    "requested_project_mode": "rapid",
+    "actual_run_mode": "wizard",
+    "injected_worker_failure": {"job_status": "FAILED", "run_state": "QUEUED", "run_error": null},
+    "predict_endpoint_in_openapi": false,
+    "model_version_deploy_endpoint_in_openapi": false,
+    "chinese_label_prepare_status": 500,
+    "project_return_keys": ["id", "name", "description", "created_at", "deleted_at"]
+  },
+  "limitations": ["No real training, quantization, inference or GPU performance measurement", "Injected failure validates control-state handling only", "Synthetic test fixtures do not validate real fraud model quality"]
+}

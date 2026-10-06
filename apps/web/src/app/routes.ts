@@ -16,10 +16,11 @@ export const ROUTES = [
   { path: 'system', label: '系统管理', icon: '⚙' },
 ] as const;
 
-export type RoutePath = (typeof ROUTES)[number]['path'];
+export type RoutePath = (typeof ROUTES)[number]['path'] | `run/${string}`;
 
 export function currentPath(): RoutePath {
   const raw = window.location.hash.replace(/^#\/?/, '');
+  if (/^run\/[A-Za-z0-9_-]+$/.test(raw)) return raw as `run/${string}`;
   const known = ROUTES.find((r) => r.path === raw);
   return known ? known.path : '';
 }
@@ -29,5 +30,6 @@ export function navigate(path: RoutePath): void {
 }
 
 export function routeTitle(path: RoutePath): string {
+  if (path.startsWith('run/')) return '训练工作区';
   return ROUTES.find((r) => r.path === path)?.label ?? '首页';
 }

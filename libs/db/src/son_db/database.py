@@ -246,15 +246,20 @@ def migrate(database: Database) -> list[int]:
             sql = script.read_text(encoding="utf-8")
             # executescript, not exec_driver_sql: a migration file holds many
             # statements and the driver-level API runs exactly one.
-            raw.executescript(sql)
-            raw.execute(
-                "INSERT INTO schema_migrations (version, script, applied_at) "
-                "VALUES (?, ?, CURRENT_TIMESTAMP)",
-                (version, script.name),
-            )
-            raw.commit()
-            raw.execute(f"PRAGMA user_version = {int(version)}")
-            raw.commit()
+            # executescript commits any pending transaction first. The BEGIN
+            # must therefore be inside the script, including the version ledger.
+            script_name = script.name.replace("'", "''")
+            try:
+                raw.executescript(
+                    "BEGIN IMMEDIATE;\n"
+                    + sql
+                    + f"\nINSERT INTO schema_migrations (version, script, applied_at) "
+                    f"VALUES ({int(version)}, '{script_name}', CURRENT_TIMESTAMP);\n"
+                    f"PRAGMA user_version = {int(version)};\nCOMMIT;"
+                )
+            except Exception:
+                raw.rollback()
+                raise
             applied.append(version)
 
     return applied

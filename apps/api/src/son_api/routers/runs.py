@@ -62,6 +62,7 @@ from son_worker.queue import JobType, enqueue
 from son_worker.queue import serialize as serialize_job
 
 from son_contracts import JEV_OUTPUT_SCHEMA, REASON_MAX_LENGTH, SynthMethod
+from son_contracts.workspace import SceneSnapshot, SetSceneRequest
 
 router = APIRouter(tags=["runs"])
 
@@ -131,6 +132,7 @@ class RunOut(BaseModel):
 
 
 class RunDetail(RunOut):
+    scene: SceneSnapshot | None = None
     dataset: dict[str, Any] | None = None
     split: dict[str, Any] | None = None
     synth: dict[str, Any] | None = None
@@ -209,21 +211,28 @@ def list_runs(project_id: str | None = None) -> list[RunOut]:
 # --------------------------------------------------------------------------
 
 
-class SetSceneRequest(BaseModel):
-    scene_code: str = Field(min_length=1, max_length=64)
-
-
-@router.patch("/api/runs/{run_id}/scene", response_model=RunDetail, summary="第1步 选择场景")
+@router.patch("/api/runs/{run_id}/scene", response_model=RunDetail, summary="第1步 定义场景")
 def set_scene(run_id: str, request: SetSceneRequest) -> RunDetail:
-    from son_api.routers.platform import SCENE_TEMPLATES
+    import uuid
 
-    if not any(t.id == request.scene_code for t in SCENE_TEMPLATES):
-        raise HTTPException(status_code=422, detail=f"未找到场景 {request.scene_code}")
+    code = f"sc_{uuid.uuid4().hex[:12]}"
+    name = request.name
+    if name is None:
+        from son_api.routers.platform import SCENE_TEMPLATES
+
+        template = next((t for t in SCENE_TEMPLATES if t.id == request.scene_code), None)
+        if template is None:
+            raise HTTPException(status_code=422, detail=f"未找到场景 {request.scene_code}")
+        code = template.id
+        name = template.name
 
     database = _db()
     with database.session() as session:
         run = _require_run(session, run_id)
-        run.scene_code = request.scene_code
+        run.scene_code = code
+        run.scene_json = SceneSnapshot(
+            code=code, name=name, description=request.description
+        ).model_dump_json()
         session.flush()
         _advance(session, run, RunState.SCENE_READY)
         return _run_detail(session, run)
@@ -360,7 +369,7 @@ def prepare(run_id: str) -> RunDetail:
 
 class SynthRequest(BaseModel):
     method: SynthMethod = SynthMethod.DISTRIBUTION_FIT
-    target_rows: int | None = Field(default=None, ge=1, le=200_000)
+    target_rows: int | None = Field(default=None, ge=0, le=200_000)
     seed: int = 42
 
 
@@ -501,6 +510,13 @@ def start(run_id: str) -> RunDetail:
     Training is minutes to hours; doing it inside a request would time out and
     report nothing. The worker picks the job up (改造开发方案.md 11).
     """
+    import os
+
+    if os.environ.get("SON_EXECUTION_MODE") == "cpu":
+        raise HTTPException(
+            status_code=409,
+            detail="当前为本机数据实验环境，未配置 GPU 执行器；数据与配置可保存，训练需在 GPU 节点运行",
+        )
     database = _db()
     with database.session() as session:
         run = _require_run(session, run_id)
@@ -627,6 +643,7 @@ def _run_out(run: RunRow) -> RunOut:
 def _run_detail(session: Any, run: RunRow) -> RunDetail:
     """Everything the wizard renders, derived from the run's own records."""
     detail = _run_out(run).model_dump()
+    detail["scene"] = load(run.scene_json)
 
     dataset = session.get(DatasetRow, run.dataset_id) if run.dataset_id else None
     split = session.get(SplitRow, run.split_id) if run.split_id else None
@@ -668,8 +685,13 @@ def _run_detail(session: Any, run: RunRow) -> RunDetail:
             "code": synth.code,
             "method": synth.method,
             "rows": synth.rows,
+            "checksum": synth.checksum,
             "fidelity_score": synth.fidelity_score,
+            # Verdict derived from the stored score so the UI does not have to
+            # re-implement the thresholds.
+            "fidelity_verdict": _fidelity_verdict(synth.fidelity_score),
             "privacy": load(synth.privacy_json),
+            "config": load(synth.config_json),
         }
         if synth
         else None
@@ -711,6 +733,24 @@ def _run_detail(session: Any, run: RunRow) -> RunDetail:
     )
     detail["lineage"] = build_lineage(session, run)
     return RunDetail(**detail)
+
+
+def _fidelity_verdict(score: float | None) -> str | None:
+    """Map a stored fidelity score to its band.
+
+    Derived here rather than duplicated in the UI: two implementations of the
+    same thresholds drift, and the user then sees a verdict that disagrees with
+    the number above it.
+    """
+    if score is None:
+        return None
+    if score >= 0.90:
+        return "excellent"
+    if score >= 0.80:
+        return "good"
+    if score >= 0.65:
+        return "acceptable"
+    return "poor"
 
 
 def build_lineage(session: Any, run: RunRow) -> dict[str, Any] | None:
@@ -758,7 +798,7 @@ def capabilities() -> dict[str, Any]:
     改造开发方案.md 31: never show a choice that does not work.
     """
     return {
-        "scene": "fraud_account",
+        "scene": "custom",
         "upload": "csv",
         "labels": ["black", "white", "gray"],
         "synth_method": SynthMethod.DISTRIBUTION_FIT.value,

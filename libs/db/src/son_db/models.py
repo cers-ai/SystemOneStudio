@@ -74,6 +74,7 @@ class RunRow(Base):
     )
 
     scene_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scene_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     mode: Mapped[str] = mapped_column(String(32), default="wizard")
     state: Mapped[str] = mapped_column(String(32), default="CREATED")
 

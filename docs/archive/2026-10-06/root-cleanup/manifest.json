@@ -1,0 +1,47 @@
+[
+  {
+    "source": "AGENTS.md",
+    "sha256": "C0EB4195C0598441CB4F7C0DB9765781653FFF45407389CA26613422E1EBF3A9",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": "README.md",
+    "sha256": "4A9600E117EAB2099EC459D86EE93867286962D4AB7533CECDDBDE6080D42B50",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": "技术方案.md",
+    "sha256": "A3A2A10838587386C0659B6BFE6EAC3BD87324748DA1E0CCC9F4BA7791219713",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": "需求重整.md",
+    "sha256": "D582CDB90D59A22D82923977BF682C55FF056A8F0B0B1119E28D2D6D7D548F70",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": "开发计划.md",
+    "sha256": "5812881A463E116D8702C78BDC95969B74E5C379254A2474E29AE0C3CFA68373",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": ".env.example",
+    "sha256": "A7BC2F8D2FF730C292AEE5DA0EDA9B9309467961FA527E0578C1AC3FA7EF2557",
+    "action": "snapshot_before_document_update"
+  },
+  {
+    "source": "SystemOneStudio-demo.html",
+    "sha256": "13934FBC0E5DD3A7A32A32B081953CA82A933EFD695A0463C27072D51A6C8721",
+    "action": "archive_remove_root_copy"
+  },
+  {
+    "source": "需求方案.txt",
+    "sha256": "AB7350CB5724947B27B3727BC2C5092168AD0929A767C5EAFD64C3AC0AC22A9A",
+    "action": "archive_remove_root_copy"
+  },
+  {
+    "source": "项目审计.md",
+    "sha256": "BCF2EF803749D875E4E19E7E0C5F3D6FC546B10231C34A826C9066B9B78BEC58",
+    "action": "move_to_docs_audit"
+  }
+]

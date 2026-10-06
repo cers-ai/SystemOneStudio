@@ -9,6 +9,17 @@
 # ---------------------------------------------------------------------------
 # Builder: resolve and install the workspace
 # ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS web-builder
+WORKDIR /build
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY libs/ui-terminology/package.json libs/ui-terminology/package.json
+RUN npm ci
+COPY tsconfig.base.json ./
+COPY apps/web/ apps/web/
+COPY libs/ui-terminology/ libs/ui-terminology/
+RUN npm run build --workspace apps/web
+
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 
 ENV UV_COMPILE_BYTECODE=1 \
@@ -85,6 +96,9 @@ COPY --from=builder --chown=son:son /opt/venv /opt/venv
 # No source tree: --no-editable put every package into site-packages. Keeping the
 # source out also means no .pth hook can point at a path that only exists in the
 # builder.
+
+COPY --from=web-builder /build/apps/web/dist /app/web
+ENV SON_WEB_DIST=/app/web
 
 WORKDIR /app
 USER son

@@ -16,3 +16,10 @@
 # when a reviewer needs to read the diff. Only line endings are normalized.
 package-lock.json text eol=lf
 uv.lock text eol=lf
+
+# Preserve original source/archive bytes so recorded SHA-256 survives a clone.
+SystemOneStudio-demo-v3.html -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+SystemOneStudio_判断模型技术方案_v3.md -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+docs/archive/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+docs/audit/2026-10-06/项目审计.md -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+docs/audit/**/*.txt whitespace=-blank-at-eof

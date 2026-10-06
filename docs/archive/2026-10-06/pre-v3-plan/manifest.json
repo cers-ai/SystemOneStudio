@@ -1,0 +1,37 @@
+[
+  {
+    "path": "开发计划.md",
+    "sha256": "6D82B636D668C1C9185336771A7A9F239E5818B0F8615DE74033BE7765CEF045",
+    "archived": true
+  },
+  {
+    "path": "技术方案.md",
+    "sha256": "46A68A4322C5114486BDF969C0558D30CF224A9ECA854D41D1E3E5CAC88ABA9C",
+    "archived": true
+  },
+  {
+    "path": "需求重整.md",
+    "sha256": "8941132AB958A9AEDFEA3809C79AD4D2F230F35CD63F8D7CF022FC3CE105DFA2",
+    "archived": true
+  },
+  {
+    "path": "README.md",
+    "sha256": "7D15FC823F17F29DAF7104BAEFA50BA76C545BB8315839CCB2328582499D9B77",
+    "archived": true
+  },
+  {
+    "path": "AGENTS.md",
+    "sha256": "C679C89F5C553B2B7773B64A638F80AF88C248ECF6C2B1172FF27CB8BABFBC68",
+    "archived": true
+  },
+  {
+    "path": "SystemOneStudio-demo-v3.html",
+    "sha256": "32878428165997CDA1B148C5612EA9B69C3B6D17D9F5C1D50E7503248DA4F6DE",
+    "archived": false
+  },
+  {
+    "path": "SystemOneStudio_判断模型技术方案_v3.md",
+    "sha256": "4EB19E591E8D58F1085264BD4B1DE720D9B91F7D6434EA8B6E645929E3405BE7",
+    "archived": false
+  }
+]

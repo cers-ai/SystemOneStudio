@@ -6,7 +6,11 @@ generation source. Feature endpoints land per the milestone plan in
 开发计划.md (M1 data, M2 training, M3 inference/eval, M5 deploy).
 """
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from son_db import Database, migrate
 
@@ -104,6 +108,9 @@ def create_app() -> FastAPI:
             reason=f"contract echo: received {len(sample)} field(s)",
         )
 
+    web_dist = Path(os.environ.get("SON_WEB_DIST", "apps/web/dist"))
+    if web_dist.is_dir():
+        app.mount("/", StaticFiles(directory=web_dist, html=True), name="web")
     return app
 
 

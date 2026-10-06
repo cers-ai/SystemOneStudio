@@ -129,6 +129,7 @@ testpaths = [
   "services/jev-adapter/tests",
   "services/assistant/tests",
   "tests/e2e",
+  "tools/tests",
 ]
 asyncio_mode = "auto"
 addopts = "-q --strict-markers"

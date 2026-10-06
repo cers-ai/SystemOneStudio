@@ -109,6 +109,7 @@ def ingest_csv(destination: Path, filename: str) -> PreparedDataset:
     detection = detect_label_column(frame)
     if detection.column:
         frame = frame.rename(columns={detection.column: LABEL_COLUMN})
+        frame = _normalize_labels(frame)
 
     from son_data_pipeline.ingest import with_origin
 
@@ -148,7 +149,7 @@ def prepare_split(
     are already de-identified. A masked copy that only existed in memory would
     mean training on data the audit trail claims was scrubbed.
     """
-    frame = pd.read_csv(dataset_path, dtype=str, keep_default_na=False)
+    frame = pd.read_csv(dataset_path, keep_default_na=False)
     if LABEL_COLUMN not in frame.columns:
         raise AssetError("数据缺少标签列，无法划分")
 
@@ -213,7 +214,7 @@ def generate_synth(
     takes the train path explicitly rather than a dataset id it could pick the
     wrong split from.
     """
-    seed_frame = pd.read_csv(train_path, dtype=str, keep_default_na=False)
+    seed_frame = pd.read_csv(train_path, keep_default_na=False)
     if seed_frame.empty:
         raise AssetError("训练集为空，无法合成")
 
@@ -227,7 +228,7 @@ def generate_synth(
     categorical = tuple(
         c for c in seed_frame.columns if not pd.api.types.is_numeric_dtype(seed_frame[c])
     )
-    rows = target_rows or recommendation.total_rows
+    rows = recommendation.total_rows if target_rows is None else target_rows
     rows = max(0, min(int(rows), 200_000))
 
     request = SynthRequest(
@@ -242,8 +243,15 @@ def generate_synth(
         seed=seed,
     )
 
-    result = synthesize(seed_frame, request)
-    frame = result.frame
+    from son_synth.generators import JointRowGenerator
+
+    if method != SynthMethod.DISTRIBUTION_FIT:
+        raise AssetError("本阶段仅支持保留标签与依据的整行重采样扩增")
+    frame = (
+        synthesize(seed_frame, request, generator=JointRowGenerator()).frame
+        if rows
+        else seed_frame.iloc[:0].copy()
+    )
 
     from son_db.assets import checksum as file_checksum
 
@@ -265,10 +273,13 @@ def generate_synth(
             "nearest_neighbour_distance": privacy.nearest_neighbour_distance,
             "nn_check_ran": privacy.nn_check_ran,
             "reversible_risk": privacy.reversible_risk,
-            "notes": list(privacy.notes),
+            "notes": [
+                *privacy.notes,
+                "整行重采样会产生重复样本，不增加新知识；可选择仅用种子",
+            ],
             "lines": privacy.describe(),
         },
-        label_counts=result.label_counts,
+        label_counts={str(k): int(v) for k, v in frame[LABEL_COLUMN].value_counts().items()},
         recommendation={
             "method": recommendation.method.value,
             "total_rows": recommendation.total_rows,
@@ -306,7 +317,16 @@ def _normalize_labels(frame: pd.DataFrame) -> pd.DataFrame:
         if detection.column:
             out = out.rename(columns={detection.column: LABEL_COLUMN})
     if LABEL_COLUMN in out.columns:
-        out[LABEL_COLUMN] = out[LABEL_COLUMN].astype(str).str.strip().str.lower()
+        from son_data_pipeline.ingest import normalize_label_value
+
+        raw = out[LABEL_COLUMN].astype(str)
+        values = raw.map(normalize_label_value)
+        invalid = raw[values.isna()].unique().tolist()
+        if invalid:
+            raise AssetError(
+                f"标签存在无法识别的值：{invalid[:10]}；请使用 black/white/gray 或 黑/白/灰"
+            )
+        out[LABEL_COLUMN] = values.map(lambda value: value.value)
     return out
 
 

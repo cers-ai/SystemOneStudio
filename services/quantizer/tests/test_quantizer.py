@@ -66,10 +66,10 @@ class TestDefaults:
     def test_q4_k_m_matches_the_jev_baseline(self) -> None:
         assert JEV_BASELINE_QUANT == "Q4_K_M"
 
-    def test_three_gguf_levels_plus_native(self) -> None:
+    def test_three_gguf_levels_plus_native(self, tmp_path: Path) -> None:
         """需求方案.txt 5.7.1 lists exactly these outputs."""
         assert len(AUTO_ARTIFACT_LEVELS) == 3
-        result = quantize_all(_request(Path(".")), RecordingTools())
+        result = quantize_all(_request(tmp_path), RecordingTools())
         assert len(artifacts_for_registration(result)) == 4
 
     def test_empty_level_list_rejected(self, tmp_path: Path) -> None:

@@ -283,6 +283,13 @@ export function label(term: TechnicalTerm): string {
   return TERM_COPY[term].label;
 }
 
+/** Unknown server identifiers must not leak into business copy. */
+export function labelOrFallback(term: string, fallback = '尚未支持'): string {
+  return TECHNICAL_TERMS.some((known) => known === term)
+    ? label(term as TechnicalTerm)
+    : fallback;
+}
+
 /** Hover hint for a technical term. */
 export function hint(term: TechnicalTerm): string {
   return TERM_COPY[term].hint;

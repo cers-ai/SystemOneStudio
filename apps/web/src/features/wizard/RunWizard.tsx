@@ -1,393 +1,84 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { labelOrFallback as termLabel } from '@son/ui-terminology';
+import { runApi, isBusy, type Run } from '@/api/runs';
+import { navigate } from '@/app/routes';
 
-import { label as termLabel } from '@son/ui-terminology';
-
-import {
-  isBusy,
-  runApi,
-  STEP_LABELS,
-  type Capabilities,
-  type Run,
-} from '@/api/runs';
-
-/**
- * The wizard, as a projection of the backend Run.
- *
- * There is deliberately no local `completedSteps` state. Each control calls a
- * backend action and the response is the new Run; nothing advances locally. That
- * is the whole point of 改造开发方案.md 2.3 -- the old wizard marked steps done
- * because the user clicked, which is how a step could look finished with no
- * dataset behind it.
- *
- * While a job owns the run, the Run is polled every 1.5s rather than opened over
- * a WebSocket (改造开发方案.md 16).
- */
-const POLL_MS = 1500;
+const STAGES = ['场景', '种子数据', '数据合成', '训练配置', '训练', '测试验证', '导出部署'];
+function suggestedStage(run: Run): number {
+  if (!run.scene_code) return 0;
+  if (!run.split_id) return 1;
+  if (!run.synth_id) return 2;
+  if (!run.training_config) return 3;
+  if (!run.model_version_id) return 4;
+  if (!run.evaluation_id) return 5;
+  return 6;
+}
 
 export function RunWizard({ runId }: { runId: string | null }) {
-  const queryClient = useQueryClient();
+  const client = useQueryClient();
+  const [selected, setSelected] = useState<number | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [target, setTarget] = useState('');
+  const [model, setModel] = useState('');
+  const [method, setMethod] = useState('lora');
   const runQuery = useQuery({
-    queryKey: ['run', runId],
-    queryFn: () => runApi.run(runId as string),
-    enabled: runId !== null,
+    queryKey: ['run', runId], queryFn: () => runApi.run(runId as string), enabled: !!runId,
+    refetchInterval: (query) => query.state.data && isBusy(query.state.data.state) ? 1500 : false,
   });
-
-  const capabilities = useQuery({
-    queryKey: ['capabilities'],
-    queryFn: runApi.capabilities,
-  });
-
-  // Poll only while a job is running. 1.5s is enough to feel live without
-  // hammering the API while training runs for an hour.
-  useEffect(() => {
-    const state = runQuery.data?.state;
-    if (!runId || !state || !isBusy(state)) return;
-    const timer = setInterval(() => {
-      void queryClient.invalidateQueries({ queryKey: ['run', runId] });
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [runId, runQuery.data?.state, queryClient]);
-
-  const refresh = (): void => {
-    if (runId) void queryClient.invalidateQueries({ queryKey: ['run', runId] });
-  };
-
-  const stepAction = useMutation({
+  const capabilities = useQuery({ queryKey: ['capabilities'], queryFn: runApi.capabilities });
+  const refresh = (): void => { void client.invalidateQueries({ queryKey: ['run', runId] }); };
+  const action = useMutation({
     mutationFn: async (kind: string) => {
-      switch (kind) {
-        case 'scene':
-          return runApi.setScene(runId as string, 'fraud_account');
-        case 'prepare':
-          return runApi.prepareData(runId as string);
-        case 'synth':
-          return runApi.synth(runId as string, 1000);
-        case 'model':
-          return runApi.setModel(runId as string, (capabilities.data?.base_models[0] ?? ''));
-        case 'config':
-          return runApi.setTrainingConfig(runId as string, { method: 'lora' });
-        case 'start':
-          return runApi.start(runId as string);
-        default:
-          throw new Error(`未知步骤动作：${kind}`);
+      const id = runId as string;
+      if (kind === 'scene') return runApi.setScene(id, { name, description });
+      if (kind === 'prepare') return runApi.prepareData(id);
+      if (kind === 'synth' || kind === 'skip') return runApi.synth(id, kind === 'skip' ? 0 : target === '' ? undefined : Number(target));
+      if (kind === 'config') {
+        if (!runQuery.data?.base_model_id) await runApi.setModel(id, model || capabilities.data?.base_models[0] || '');
+        return runApi.setTrainingConfig(id, { method });
       }
+      if (kind === 'start') return runApi.start(id);
+      throw new Error('未知操作');
     },
-    onSuccess: refresh,
+    onSuccess: (run) => { client.setQueryData(['run', runId], run); setSelected(null); },
   });
-
-  if (!runId) {
-    return (
-      <div className="empty">
-        请先选择一个 Run。可在「项目」页新建，或从下面选择一个已有的 Run。
-        <RunPicker onPick={refresh} />
-      </div>
-    );
-  }
-
-  if (runQuery.isPending) return <div className="empty">加载 Run…</div>;
-  if (runQuery.isError) {
-    return (
-      <div className="note note--bad">
-        <span className="note__mark">!</span>
-        <span>读取 Run 失败：{runQuery.error.message}</span>
-      </div>
-    );
-  }
-
+  if (!runId) return <WorkspaceLanding />;
+  if (runQuery.isPending) return <div className="empty">正在打开工作区…</div>;
+  if (runQuery.isError) return <div className="note note--bad">{runQuery.error.message}</div>;
   const run = runQuery.data;
-  const busy = isBusy(run.state);
-
-  return (
-    <>
-      <StepRail run={run} />
-
-      <div className="step">
-        <header className="step__head">
-          <div className="step__eyebrow">
-            第 {run.current_step} 步 / 共 7 · 状态 {run.state}
-          </div>
-          <h1 className="step__title">{STEP_LABELS[run.current_step] ?? run.state}</h1>
-          <p className="step__hint">
-            当前 Run 状态由后端决定。页面上没有"完成"按钮——每一步都调用后端动作，
-            资产真正生成后 Run 才会前进。
-          </p>
-        </header>
-
-        {run.error_message ? (
-          <div className="note note--bad" style={{ marginBottom: 'var(--sp-4)' }}>
-            <span className="note__mark">!</span>
-            <span>{run.error_message}</span>
-          </div>
-        ) : null}
-
-        <StepPanel
-          run={run}
-          capabilities={capabilities.data}
-          busy={busy}
-          pending={stepAction.isPending}
-          error={stepAction.isError ? stepAction.error.message : null}
-          onScene={() => stepAction.mutate('scene')}
-          onPrepare={() => stepAction.mutate('prepare')}
-          onSynth={() => stepAction.mutate('synth')}
-          onModel={() => stepAction.mutate('model')}
-          onConfig={() => stepAction.mutate('config')}
-          onStart={() => stepAction.mutate('start')}
-          onUpload={() => refresh()}
-        />
-
-        {run.lineage ? (
-          <div className="card" style={{ marginTop: 'var(--sp-4)' }}>
-            <div className="card__title">血缘</div>
-            <div className="card__sub">由系统根据各步骤实际产出的资产自动生成，不接受前端填写。</div>
-            <div className="kv">
-              {Object.entries(run.lineage).map(([key, value]) => (
-                <div key={key} style={{ display: 'contents' }}>
-                  <dt>{LINEAGE_LABEL[key] ?? key}</dt>
-                  <dd className="mono">{value}</dd>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </>
-  );
+  const stage = selected ?? suggestedStage(run);
+  const pending = action.isPending || isBusy(run.state);
+  const button = (kind: string, text: string, enabled: boolean): React.ReactNode =>
+    <button className="btn btn--primary" type="button" disabled={pending || !enabled} onClick={() => action.mutate(kind)}>{action.isPending ? '处理中…' : text}</button>;
+  return <>
+    <div className="workspace__heading"><div><span className="workspace__eyebrow">YOUR DECISION LAB</span><h1>{run.scene?.name ?? '定义你的第一个场景'}</h1><p>{run.scene?.description || '从一份有标注的种子数据开始，建立可验证、可交付的决策模型。'}</p></div><button className="btn btn--ghost" onClick={() => navigate('wizard')} type="button">全部工作区 ↗</button></div>
+    <nav className="stagebar" aria-label="流程导航">{STAGES.map((label, index) => <button type="button" key={label} className={stage === index ? 'stagebar__item is-current' : 'stagebar__item'} aria-current={stage === index ? 'step' : undefined} onClick={() => { setSelected(index); action.reset(); }}><span>{index < suggestedStage(run) ? '✓' : String(index + 1).padStart(2, '0')}</span>{label}</button>)}</nav>
+    <div className="workspace__grid"><section className="workspace__canvas">
+      <div className="workspace__section"><span className="workspace__eyebrow">STEP {String(stage + 1).padStart(2, '0')}</span><h2>{STAGES[stage]}</h2></div>
+      {action.isError ? <div className="note note--bad" role="alert">{action.error.message}</div> : null}
+      {run.error_message ? <div className="note note--bad" role="alert">{run.error_message}</div> : null}
+      {stage === 0 ? <div className="card">{run.scene_code ? <><h3>{run.scene?.name ?? run.scene_code}</h3><p>{run.scene?.description}</p><p className="card__sub">场景已保存。修改目标请新建工作区，保留当前数据与历史。</p></> : <><label className="field"><span className="field__label">场景名称</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：设备质检分级" maxLength={200} /></label><label className="field"><span className="field__label">描述你希望模型判断什么</span><textarea className="input" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="说明输入内容，以及三类决策分别代表什么。真实标注以种子文件为准。" maxLength={4000} /></label>{button('scene', '保存场景，开始准备数据 →', !!name.trim())}</>}</div> : null}
+      {stage === 1 ? <>{run.dataset ? <div className="card"><h3>{run.dataset.original_filename}</h3><div className="workspace__numbers"><span><strong>{run.dataset.rows}</strong>种子样本</span><span><strong>{run.dataset.cols}</strong>数据字段</span></div>{!run.split ? button('prepare', '检查、脱敏并划分数据 →', true) : <QualityCard run={run} />}</div> : <UploadCard run={run} onUploaded={refresh} disabled={pending || !run.scene_code} />}{!run.scene_code ? <p className="card__sub">先定义场景，即可上传。</p> : null}</> : null}
+      {stage === 2 ? <div className="card"><h3>保留判断关系的样本扩增</h3><p className="card__sub">从训练集整行重采样，特征、标签和依据一起保留。此方式会产生重复，不增加新知识；测试集与验证集保持原始种子。</p>{run.synth ? <><div className="workspace__numbers"><span><strong>{run.synth.rows}</strong>扩增样本</span></div>{run.synth.privacy?.notes.map((note) => <p className="card__sub" key={note}>{note}</p>)}</> : <><label className="field"><span className="field__label">扩增数量（留空采用数据建议）</span><input className="input" type="number" min="1" max="200000" value={target} onChange={(e) => setTarget(e.target.value)} /></label><div className="workspace__actions">{button('synth', '生成扩增数据 →', !!run.split_id && (target === '' || Number(target) > 0))}{button('skip', '仅用种子继续', !!run.split_id)}</div>{!run.split_id ? <p className="card__sub">先完成种子检查与划分。</p> : null}</>}</div> : null}
+      {stage === 3 ? <div className="card"><h3>选择适合当前任务的训练配置</h3><label className="field"><span className="field__label">基础模型</span><select className="select" value={run.base_model_id ?? model} disabled={!!run.base_model_id} onChange={(e) => setModel(e.target.value)}><option value="">采用推荐模型</option>{capabilities.data?.base_models.map((id) => <option key={id} value={id}>{id}</option>)}</select></label><label className="field"><span className="field__label">训练方法</span><select className="select" value={method} onChange={(e) => setMethod(e.target.value)}>{capabilities.data?.training_methods.map((id) => <option value={id} key={id}>{termLabel(id)}</option>)}</select></label><p className="card__sub">模型与方法已接入代码；实际训练组合仍需 GPU 实测。本机实验先保存配置。</p>{run.training_config ? <p>配置已保存，可进入训练。</p> : button('config', '保存训练配置 →', !!run.synth_id)}</div> : null}
+      {stage === 4 ? <div className="card"><h3>准备开始训练</h3><p className="card__sub">任务在服务器执行，数据和模型产物与当前工作区关联。本机数据实验环境没有训练设备，开始前会检查并说明原因。</p>{run.job ? <JobCard run={run} /> : button('start', '检查环境并开始训练 →', !!run.training_config)}{run.model_version ? <p>模型版本：{run.model_version.code}</p> : null}</div> : null}
+      {stage === 5 ? <div className="card"><h3>用独立测试集检验模型</h3><p className="card__sub">完成真实训练并加载模型后，才能运行测试验证。当前{run.evaluation ? '有历史评测记录，实际执行接入正在完善。' : '尚无真实模型评测结果。'}</p><QualityCard run={run} /></div> : null}
+      {stage === 6 ? <div className="card"><h3>交付你的模型</h3><p className="card__sub">真实模型产物就绪后，可导出模型包或启动预测服务。工作区备份与模型导出分别交付。</p><p>{run.model_version ? `模型版本：${run.model_version.code}，交付能力正在接入。` : '尚未生成可交付的模型。'}</p></div> : null}
+    </section><aside className="workspace__context"><span className="workspace__eyebrow">WORKSPACE</span><h3>每一步都有据可查</h3><dl><dt>当前阶段</dt><dd>{STAGES[suggestedStage(run)]}</dd><dt>种子数据</dt><dd>{run.dataset ? `${run.dataset.rows} 条` : '等待上传'}</dd><dt>独立测试数据</dt><dd>{run.split ? `${run.split.test_rows} 条种子` : '等待划分'}</dd><dt>模型产物</dt><dd>{run.model_version?.code ?? '未生成'}</dd></dl><p>顶部步骤可自由查看；执行动作会检查前置数据。刷新后继续当前工作区。</p><details><summary>查看记录标识</summary><code>{run.id}</code>{run.lineage ? Object.entries(run.lineage).map(([key,value]) => <p key={key}><small>{key}</small><br /><code>{value}</code></p>) : null}</details></aside></div>
+  </>;
 }
 
-const LINEAGE_LABEL: Record<string, string> = {
-  run: 'Run',
-  scene: '场景',
-  dataset: '数据集',
-  split: '划分',
-  synth: '合成',
-  base_model: '基座模型',
-  job: '任务',
-  model_version: '模型版本',
-};
-
-function StepRail({ run }: { run: Run }) {
-  return (
-    <nav className="rail" aria-label="流程步骤">
-      <div className="rail__heading">训练流程</div>
-      <div className="rail__progress">
-        <div className="rail__progress-track">
-          <div
-            className="rail__progress-fill"
-            style={{ width: `${Math.round(((run.current_step - 1) / 7) * 100)}%` }}
-          />
-        </div>
-        <div className="rail__progress-label">
-          第 {run.current_step} 步 · 后端状态 {run.state}
-        </div>
-      </div>
-      <ol className="rail__list">
-        {[1, 2, 3, 4, 5, 6, 7].map((step) => {
-          const done = run.current_step > step;
-          const current = run.current_step === step;
-          return (
-            <li key={step} className={`rail__item${done ? ' rail__item--done' : ''}`}>
-              <span
-                className="rail__button"
-                aria-current={current ? 'step' : undefined}
-              >
-                <span className="rail__marker">{done ? '✓' : step}</span>
-                <span className="rail__label">{STEP_LABELS[step]}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
-
-interface PanelProps {
-  run: Run;
-  capabilities?: Capabilities;
-  busy: boolean;
-  pending: boolean;
-  error: string | null;
-  onScene: () => void;
-  onPrepare: () => void;
-  onSynth: () => void;
-  onModel: () => void;
-  onConfig: () => void;
-  onStart: () => void;
-  onUpload: () => void;
-}
-
-function StepPanel(props: PanelProps) {
-  const { run, busy, pending } = props;
-  const disabled = busy || pending;
-
-  switch (run.state) {
-    case 'CREATED':
-      return (
-        <ActionCard
-          title="选择场景"
-          detail="反诈账户判定是本阶段唯一打通的场景模板。"
-          action="选择「反诈账户判定」"
-          onClick={props.onScene}
-          disabled={disabled}
-          error={props.error}
-        />
-      );
-
-    case 'SCENE_READY':
-      return <UploadCard run={run} onUploaded={props.onUpload} disabled={disabled} />;
-
-    case 'DATASET_READY':
-      return (
-        <ActionCard
-          title="数据治理与划分"
-          detail="自动脱敏、质量评分、按 7:1.5:1.5 划分，并断言测试集不含合成数据。"
-          action="执行数据治理"
-          onClick={props.onPrepare}
-          disabled={disabled}
-          error={props.error}
-        />
-      );
-
-    case 'DATA_QUALITY_READY':
-      return (
-        <>
-          <QualityCard run={run} />
-          <ActionCard
-            title="生成合成数据"
-            detail="从训练集扩增样本；测试集永远是原始上传数据。"
-            action="开始合成"
-            onClick={props.onSynth}
-            disabled={disabled}
-            error={props.error}
-          />
-        </>
-      );
-
-    case 'TRAIN_SET_READY':
-      return (
-        <ActionCard
-          title="选择基座模型"
-          detail={`本阶段支持：${props.capabilities?.base_models.join('、') ?? '加载中'}`}
-          action="选择推荐模型"
-          onClick={props.onModel}
-          disabled={disabled}
-          error={props.error}
-        />
-      );
-
-    case 'MODEL_SELECTED':
-      return (
-        <ActionCard
-          title="配置训练方法"
-          detail={`本阶段支持${termLabel('lora')}；低显存快速适配与决策优化训练属于后续阶段。`}
-          action="使用推荐配置"
-          onClick={props.onConfig}
-          disabled={disabled}
-          error={props.error}
-        />
-      );
-
-    case 'TRAINING_CONFIGURED':
-      return (
-        <ActionCard
-          title="开始训练"
-          detail="提交后台任务，由 worker 执行训练、合并与压缩导出。此操作不会阻塞页面。"
-          action="开始训练"
-          onClick={props.onStart}
-          disabled={disabled}
-          error={props.error}
-        />
-      );
-
-    case 'QUEUED':
-    case 'TRAINING':
-    case 'MERGING':
-    case 'QUANTIZING':
-    case 'EVALUATING':
-    case 'DEPLOYING':
-      return <JobCard run={run} />;
-
-    case 'MODEL_READY':
-      return (
-        <div className="card">
-          <div className="card__title">模型已就绪</div>
-          <div className="card__sub">
-            部署需要在具备本地推理运行时的节点上执行。点击部署会真实启动服务并做健康检查，
-            通过后才标记为服务中。
-          </div>
-          <div className="kv">
-            <dt>模型版本</dt>
-            <dd className="mono">{run.model_version?.code ?? '—'}</dd>
-            <dt>适配器</dt>
-            <dd className="mono">{run.model_version?.adapter_path ?? '—'}</dd>
-          </div>
-        </div>
-      );
-
-    case 'SERVING':
-      return (
-        <div className="card">
-          <div className="card__title">服务中</div>
-          <div className="kv">
-            <dt>端口</dt>
-            <dd>{run.deployment?.port ?? '—'}</dd>
-            <dt>状态</dt>
-            <dd>{run.deployment?.status ?? '—'}</dd>
-          </div>
-        </div>
-      );
-
-    case 'FAILED':
-      return (
-        <div className="card">
-          <div className="card__title">运行失败</div>
-          <div className="note note--bad">
-            <span className="note__mark">!</span>
-            <span>{run.error_message ?? '未记录原因'}</span>
-          </div>
-          {run.job?.log_path ? (
-            <p className="card__sub" style={{ marginTop: 'var(--sp-3)' }}>
-              日志：<span className="mono">{run.job.log_path}</span>
-            </p>
-          ) : null}
-        </div>
-      );
-
-    default:
-      return <div className="empty">未知状态：{run.state}</div>;
-  }
-}
-
-function ActionCard({
-  title,
-  detail,
-  action,
-  onClick,
-  disabled,
-  error,
-}: {
-  title: string;
-  detail: string;
-  action: string;
-  onClick: () => void;
-  disabled?: boolean;
-  error?: string | null;
-}) {
-  return (
-    <div className="card">
-      <div className="card__title">{title}</div>
-      <div className="card__sub">{detail}</div>
-      {error ? (
-        <div className="note note--bad">
-          <span className="note__mark">!</span>
-          <span>{error}</span>
-        </div>
-      ) : null}
-      <button type="button" className="btn btn--primary" onClick={onClick} disabled={disabled}>
-        {action}
-      </button>
-    </div>
-  );
+function WorkspaceLanding() {
+  const [name, setName] = useState('');
+  const runs = useQuery({ queryKey: ['runs'], queryFn: () => runApi.runs() });
+  const create = useMutation({ mutationFn: async () => {
+    const project = await runApi.createProject(name.trim() || '我的决策实验');
+    const run = await runApi.createRun(project.id);
+    navigate(`run/${run.id}`);
+  } });
+  return <><section className="workspace__hero"><span className="workspace__eyebrow">FROM DATA TO DECISIONS</span><h1>让你的判断，<br /><em>成为模型的能力。</em></h1><p>定义场景、准备数据、训练验证，在一个工作区完成。</p><div className="workspace__create"><input className="input" aria-label="工作区名称" placeholder="给这次实验起个名字（可选）" value={name} onChange={(e) => setName(e.target.value)} /><button className="btn btn--primary" disabled={create.isPending} onClick={() => create.mutate()} type="button">{create.isPending ? '正在创建…' : '创建工作区 ↗'}</button></div>{create.isError ? <p role="alert">{create.error.message}</p> : null}</section><section className="workspace__recent"><h2>继续你的实验</h2>{runs.isError ? <div role="alert">{runs.error.message}</div> : null}{runs.isPending ? <p>正在读取工作区…</p> : null}{runs.data?.length === 0 ? <p className="card__sub">第一份数据，第一条可验证的判断。从这里开始。</p> : null}<div className="workspace__tiles">{runs.data?.map((run) => <button type="button" className="workspace__tile" key={run.id} onClick={() => navigate(`run/${run.id}`)}><span>↗</span><strong>{run.scene_code ?? '未定义场景'}</strong><small>{run.id}</small></button>)}</div></section></>;
 }
 
 function UploadCard({
@@ -432,7 +123,7 @@ function UploadCard({
           ⬆
         </div>
         <div className="dropzone__title">{busy ? '上传中…' : '点击选择 CSV'}</div>
-        <div className="dropzone__hint">需含 black / white / gray 三分类标签列</div>
+        <div className="dropzone__hint">标签使用 black / white / gray 或 黑 / 白 / 灰；训练还需要每条数据的 reason 判定依据</div>
         <input
           className="dropzone__input"
           type="file"
@@ -537,57 +228,8 @@ function JobCard({ run }: { run: Run }) {
       ) : null}
 
       <p className="card__sub" style={{ marginTop: 'var(--sp-3)' }}>
-        训练由后台 worker 执行，页面每 1.5 秒轮询一次进度。可以离开本页。
+        任务在服务器后台执行，关闭页面后仍会继续。
       </p>
-    </div>
-  );
-}
-
-function RunPicker({ onPick }: { onPick: () => void }) {
-  const runs = useQuery({ queryKey: ['runs'], queryFn: () => runApi.runs() });
-  const projects = useQuery({ queryKey: ['projects'], queryFn: runApi.projects });
-  const queryClient = useQueryClient();
-
-  const startNew = async (): Promise<void> => {
-    let projectId = projects.data?.[0]?.id;
-    if (!projectId) {
-      const project = await runApi.createProject(`新建项目 ${new Date().toLocaleDateString('zh-CN')}`);
-      projectId = project.id;
-    }
-    await runApi.createRun(projectId);
-    await queryClient.invalidateQueries({ queryKey: ['runs'] });
-    onPick();
-  };
-
-  return (
-    <div style={{ marginTop: 'var(--sp-4)', textAlign: 'left' }}>
-      <button type="button" className="btn btn--primary" onClick={() => void startNew()}>
-        新建 Run
-      </button>
-      {runs.data && runs.data.length > 0 ? (
-        <ul className="row-list" style={{ marginTop: 'var(--sp-4)' }}>
-          {runs.data.slice(0, 8).map((run) => (
-            <li className="row-item" key={run.id}>
-              <div className="row-item__main">
-                <div className="row-item__title">第 {run.current_step} 步</div>
-                <div className="row-item__meta">
-                  {run.state} · {run.id}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  window.location.hash = `/run/${run.id}`;
-                  onPick();
-                }}
-              >
-                打开
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }

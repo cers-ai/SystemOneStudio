@@ -123,6 +123,34 @@ class Generator(ABC):
         return rows
 
 
+class JointRowGenerator(Generator):
+    """Conservative resampling: preserve features, label and reason together.
+
+    Produces duplicates, not novel evidence. Risk reports must expose that fact.
+    Without a validated business rule, perturbing a feature while copying its
+    original explanation would invent supervision.
+    """
+
+    def generate(self, seed_frame: pd.DataFrame, request: SynthRequest) -> pd.DataFrame:
+        pool = seed_frame.copy()
+        for constraint in request.constraints:
+            if constraint.column not in pool:
+                raise ValueError(f"missing constrained column: {constraint.column}")
+            values = pd.to_numeric(pool[constraint.column], errors="coerce")
+            eligible = values.notna()
+            if constraint.minimum is not None:
+                eligible &= values >= constraint.minimum
+            if constraint.maximum is not None:
+                eligible &= values <= constraint.maximum
+            pool = pool.loc[eligible]
+        if pool.empty:
+            raise ValueError("no seed rows satisfy the constraints")
+        rows = pool.sample(n=request.target_rows, replace=True, random_state=request.seed)
+        rows = rows.reset_index(drop=True)
+        rows[request.origin_column] = DataOrigin.SYNTH.value
+        return rows
+
+
 class GaussianCopulaGenerator(Generator):
     """Dependency-free tabular synthesizer.
 

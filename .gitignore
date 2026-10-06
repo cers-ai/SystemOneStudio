@@ -12,6 +12,9 @@ htmlcov/
 
 # --- Runtime state (SQLite + workspace; see 改造开发方案.md section 6.2) ---
 /runtime/
+/out/
+# compose resolves relative paths against its own directory
+deploy/compose/runtime/
 
 # --- Node ---
 node_modules/

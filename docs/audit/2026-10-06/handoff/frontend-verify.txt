@@ -1,0 +1,61 @@
+
+> systemone-studio@0.1.0 verify
+> npm run lint && npm run typecheck && npm run test
+
+
+> systemone-studio@0.1.0 lint
+> npm run lint --workspaces --if-present
+
+
+> @son/web@0.1.0 lint
+> eslint .
+
+
+> @son/ui-terminology@0.1.0 lint
+> eslint .
+
+
+> systemone-studio@0.1.0 typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @son/web@0.1.0 typecheck
+> tsc -b --noEmit
+
+
+> @son/ui-terminology@0.1.0 typecheck
+> tsc -b --noEmit
+
+
+> systemone-studio@0.1.0 test
+> npm run test --workspaces --if-present
+
+
+> @son/web@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/SystemOneStudio/apps/web
+
+ ✓ src/features/system/terminology-leak.test.ts (45 tests) 32ms
+ ✓ src/app/routes.test.ts (5 tests) 7ms
+
+ Test Files  2 passed (2)
+      Tests  50 passed (50)
+   Start at  20:20:47
+   Duration  3.71s (transform 148ms, setup 564ms, collect 126ms, tests 40ms, environment 2.74s, prepare 428ms)
+
+
+> @son/ui-terminology@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 D:/SystemOneStudio/libs/ui-terminology
+
+ ✓ tests/terminology.test.ts (56 tests) 30ms
+
+ Test Files  1 passed (1)
+      Tests  56 passed (56)
+   Start at  20:20:51
+   Duration  967ms (transform 87ms, setup 0ms, collect 98ms, tests 30ms, environment 0ms, prepare 261ms)
+

@@ -1,52 +1,20 @@
 name: systemone-studio
 
-# Containerized deployment (改造开发方案.md 28).
-#
-#   npm run up     # docker compose ... up -d --build
-#   open http://127.0.0.1:9969
-#
-# Two processes, one port:
-#   web  nginx: serves the SPA and proxies the API, so the browser sees one origin
-#   api  FastAPI: control plane, owns runtime/ on a mounted volume
-#   worker: the job runner, started separately (see worker below)
-#
-# PostgreSQL and Redis are gone. State lives in runtime/systemone.db and the
-# run assets in runtime/workspace, both on a bind mount so they survive a rebuild
-# and can be inspected from the host. 改造开发方案.md 28.
-#
-# The worker runs in its own profile because it needs the GPU stack; the control
-# plane does not, and shipping torch to the API container would triple its size
-# for no benefit.
-#
-#   docker compose -f deploy/compose/docker-compose.prod.yml --profile worker up -d
-
+# Local Docker Desktop experiment: one application, one URL, persistent assets.
+# No GPU training is advertised by this CPU image.
 services:
-  web:
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-    image: son-web:0.1.0
-    container_name: son-web
-    restart: unless-stopped
-    ports:
-      - '${SON_PUBLIC_PORT:-9969}:80'
-    depends_on:
-      api:
-        condition: service_healthy
-    networks: [sonnet]
-
-  api:
+  studio:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-    image: son-api:0.1.0
-    container_name: son-api
+    image: systemone-studio:cpu-dev
     restart: unless-stopped
-    expose:
-      - '9969'
+    ports:
+      - '${SON_PUBLIC_PORT:-9969}:9969'
     environment:
       SON_DB_PATH: /data/systemone.db
       SON_WORKSPACE: /data/workspace
+      SON_EXECUTION_MODE: cpu
     volumes:
       - ${SON_DATA_DIR:-./runtime}:/data
     healthcheck:
@@ -55,34 +23,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    networks: [sonnet]
-
-  # The GPU half. Started only with --profile worker.
-  worker:
-    build:
-      context: ../..
-      dockerfile: deploy/gpu/Dockerfile.gpu
-    image: son-gpu:0.1.0
-    container_name: son-worker
-    profiles: ['worker']
-    restart: unless-stopped
-    gpus: all
-    shm_size: '8gb'
-    command: ['python', '-m', 'son_worker']
-    environment:
-      SON_DB_PATH: /data/systemone.db
-      SON_WORKSPACE: /data/workspace
-      HF_HOME: /data/hf-cache
-    volumes:
-      - ${SON_DATA_DIR:-./runtime}:/data
-    depends_on:
-      api:
-        condition: service_healthy
-    networks: [sonnet]
-
-networks:
-  sonnet:
-    driver: bridge
-
-# No volumes: runtime/ is a bind mount so the host can read the database, inspect
-# a failed job's log, and copy a GGUF out. A named volume would hide all three.

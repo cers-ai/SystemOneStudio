@@ -65,10 +65,13 @@ export interface BodySynthApiDatasetsSynthPost {
   upload: string;
 }
 
+export interface BodyUploadDatasetApiRunsRunIdDatasetPost {
+  upload: string;
+}
+
 export interface Createprojectrequest {
   name: string;
-  scene_id?: string | null;
-  mode?: Uimode;
+  description?: string;
 }
 
 export interface Createscenerequest {
@@ -255,14 +258,12 @@ export interface Previewresponse {
   preview_limit?: number;
 }
 
-export interface Project {
+export interface Projectout {
   id: string;
-  code: string;
   name: string;
-  mode: Uimode;
-  scene_code: string | null;
+  description: string;
   created_at: string;
-  note?: string;
+  deleted_at?: string | null;
 }
 
 export interface Providersview {
@@ -282,7 +283,65 @@ export interface Qualityresponse {
 
 export type Quantlevel = "Q4_K_M" | "Q5_K_M" | "Q8_0";
 
+export interface Rundetail {
+  id: string;
+  project_id: string;
+  state: string;
+  mode: string;
+  current_step: number;
+  scene_code: string | null;
+  base_model_id: string | null;
+  dataset_id: string | null;
+  split_id: string | null;
+  synth_id: string | null;
+  job_id: string | null;
+  model_version_id: string | null;
+  evaluation_id: string | null;
+  deployment_id: string | null;
+  error_message: string | null;
+  available_actions: unknown[];
+  created_at: string;
+  updated_at: string;
+  scene?: Scenesnapshot | null;
+  dataset?: Record<string, unknown> | null;
+  split?: Record<string, unknown> | null;
+  synth?: Record<string, unknown> | null;
+  training_config?: Record<string, unknown> | null;
+  job?: Record<string, unknown> | null;
+  model_version?: Record<string, unknown> | null;
+  evaluation?: Record<string, unknown> | null;
+  deployment?: Record<string, unknown> | null;
+  lineage?: Record<string, unknown> | null;
+}
+
+export interface Runout {
+  id: string;
+  project_id: string;
+  state: string;
+  mode: string;
+  current_step: number;
+  scene_code: string | null;
+  base_model_id: string | null;
+  dataset_id: string | null;
+  split_id: string | null;
+  synth_id: string | null;
+  job_id: string | null;
+  model_version_id: string | null;
+  evaluation_id: string | null;
+  deployment_id: string | null;
+  error_message: string | null;
+  available_actions: unknown[];
+  created_at: string;
+  updated_at: string;
+}
+
 export type Runstate = "pending" | "running" | "paused" | "succeeded" | "failed" | "cancelled";
+
+export interface Scenesnapshot {
+  code: string;
+  name: string;
+  description: string;
+}
 
 export interface Scenesummary {
   id: string;
@@ -317,6 +376,16 @@ export interface Servicestatus {
   name: string;
   ok: boolean;
   detail: string;
+}
+
+export interface Setmodelrequest {
+  model_id: string;
+}
+
+export interface Setscenerequest {
+  name?: string | null;
+  description?: string;
+  scene_code?: string | null;
 }
 
 export interface Settingsview {
@@ -361,6 +430,12 @@ export interface Synthrecommendationresponse {
   describe: string;
 }
 
+export interface Synthrequest {
+  method?: Synthmethod;
+  target_rows?: number | null;
+  seed?: number;
+}
+
 export interface Synthresponse {
   method: string;
   rows: number;
@@ -393,7 +468,12 @@ export interface Toolsview {
   tools: unknown[];
 }
 
-export type Uimode = "wizard" | "canvas" | "rapid" | "expert";
+export interface Trainingconfigrequest {
+  method?: string;
+  max_steps?: number | null;
+  learning_rate?: number | null;
+  qlora?: boolean;
+}
 
 export interface Updatepreferencesrequest {
   ground_with_platform_state?: boolean | null;

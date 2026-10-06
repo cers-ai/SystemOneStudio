@@ -1,3 +1,5 @@
+import type { Scenesnapshot, Setscenerequest } from './generated/types';
+
 /**
  * Run API client.
  *
@@ -38,7 +40,9 @@ export interface RunSynth {
   code: string;
   method: string;
   rows: number;
+  checksum: string;
   fidelity_score: number | null;
+  fidelity_verdict: string | null;
   privacy: {
     reversible_risk: string;
     lines: string[];
@@ -77,6 +81,7 @@ export interface RunDeployment {
 }
 
 export interface Run {
+  scene?: Scenesnapshot | null;
   id: string;
   project_id: string;
   state: string;
@@ -143,9 +148,13 @@ export class RunApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers,
   });
   if (!response.ok) {
     throw new RunApiError(response.status, extractDetail(await response.text()));
@@ -202,15 +211,15 @@ export const runApi = {
   runs: (projectId?: string) =>
     request<Run[]>(`/api/runs${projectId ? `?project_id=${projectId}` : ''}`),
 
-  setScene: (runId: string, sceneCode: string) =>
+  setScene: (runId: string, scene: Setscenerequest) =>
     request<Run>(`/api/runs/${runId}/scene`, {
       method: 'PATCH',
-      body: JSON.stringify({ scene_code: sceneCode }),
+      body: JSON.stringify(scene),
     }),
   uploadDataset: (runId: string, file: File) =>
     upload<Run>(`/api/runs/${runId}/dataset`, file),
   prepareData: (runId: string) => request<Run>(`/api/runs/${runId}/prepare-data`, { method: 'POST' }),
-  synth: (runId: string, targetRows: number) =>
+  synth: (runId: string, targetRows?: number) =>
     request<Run>(`/api/runs/${runId}/synth`, {
       method: 'POST',
       body: JSON.stringify({ target_rows: targetRows }),

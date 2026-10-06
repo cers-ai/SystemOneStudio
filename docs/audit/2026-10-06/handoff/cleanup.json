@@ -1,0 +1,27 @@
+[
+  {
+    "path": "merged.safetensors",
+    "action": "moved_to_recoverable_local_archive",
+    "archive": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3\\merged.safetensors"
+  },
+  {
+    "path": "out",
+    "action": "moved_to_recoverable_local_archive",
+    "archive": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3\\out"
+  },
+  {
+    "path": ".mypy_cache",
+    "action": "moved_to_recoverable_local_archive",
+    "archive": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3\\.mypy_cache"
+  },
+  {
+    "path": ".pytest_cache",
+    "action": "moved_to_recoverable_local_archive",
+    "archive": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3\\.pytest_cache"
+  },
+  {
+    "path": ".ruff_cache",
+    "action": "moved_to_recoverable_local_archive",
+    "archive": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3\\.ruff_cache"
+  }
+]
