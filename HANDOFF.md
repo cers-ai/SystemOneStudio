@@ -2,6 +2,8 @@
 
 日期：2026-10-06。交接对象：接手工程师或编码代理。用户已批准 P3 实施，无需重新请求整体授权。
 
+2026-10-12 增补：用户要求系统配置增加教师模型与基模型管理。需求重整 R4、技术方案 T4、开发计划 P4 已纳入边界；代码尚未实现这些新配置能力。当前旧代码状态见下文，增量状态见第 13 节。
+
 **当前交付的是工程基线和 V3 CPU 数据基础，不是完整判断模型训练产品。** 真 GPU Spike、V3 产品主链、校准/策略、真实发布和完整七步界面均未完成。以下内容用于从现状继续开发，不从头重新规划。
 
 ## 1. 先读与文件权威
@@ -226,3 +228,15 @@ GitHub交接是代码/fixture/文档，不含真实运行状态。若需交用�
 ### 根目录清理回执
 
 递归永久删除被自动审批以blocked by policy拒绝，未执行；改用可恢复归档后已完成移出根目录。测试假模型/out及工具缓存保存于本机临时目录 C:\Users\Administrator\AppData\Local\Temp\systemone-root-cleanup-2f8824f3fec844eab81f6acbd8f8d8a3，逐项回执见docs/audit/2026-10-06/handoff/cleanup.json。node_modules、.venv和runtime未删除。
+
+## 13. 2026-10-12 用户新增需求：系统配置（尚未实现）
+
+用户希望在系统配置内管理多个 OpenAI-compatible 教师 provider/model，并从界面下载/导入多个基模型，允许填写模型来源、目录与参数。本轮完成需求与设计增补，代码尚无变化；后续把 A11/A12 并入 W2/W8/W9。
+
+多配置值得支持，但不要求用户必须配置多个。教师连接与模型分开；P0 可创建多个连接与模型 ID、保存凭据、仅做不带样本的连通性探测。配置默认值只用于预选，不意味着可在 P0 主链调用教师。V3 将教师生成列为 P1，所以真实样本生成/软标签/外部调用仍暂不开放；未来每个任务必须显式绑定单个模型、显示数据外发范围并固化 lineage；无隐式并发和 fallback。现有 `services/assistant` 是旧助手单配置，不可作为教师业务实体或绕开 P1 的路径。
+
+基模型可以在磁盘上缓存多个 artifact，但每个 recipe 绑定精确 revision，且只开放通过 V3 adapter/tokenizer/token-map/训练栈门槛的版本。下载完成不等于训练可用；Qwen3.5-2B-Base 首选，0.8B 要独立验收。首阶段可支持仓库 ID + 固定 revision、服务器/容器可读本地目录；不把单一权重 URL 当成完整模型，不接受任意 Transformers kwargs，`trust_remote_code` 默认关闭。模型存储需校验文件清单/hash、保留来源/许可、支持下载中断/取消/重试，并核对宿主路径在容器内真实可见。多个模型留在磁盘不代表同时常驻 GPU。
+
+待执行：A11 教师连接/模型 CRUD 与无样本 `/models` 探测、密钥不回读和日志脱敏；A12 BaseModelArtifact 版本化 registry、下载/导入 job、hash/结构检查、状态/取消/重试、路径验证与适配能力门控。同步更新 System Settings UI、OpenAPI 生成类型及实施记录。
+
+尚未做：SQLite migration、SecretStore、任何新 API/UI、真实远程下载、GPU 兼容验收。旧模型货架仍为静态注册表，不可描述成上述能力已存在。无 GPU 时继续 CPU 侧开发与文件/协议检查，GPU Spike 仍未验收。

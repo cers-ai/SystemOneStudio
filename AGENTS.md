@@ -4,7 +4,7 @@
 
 用户已于 2026-10-06 明确批准开发计划 P3，授权按 W0–W9 实施。后续开发不需要重复请求整体批准。没有 GPU 时继续可独立验证的 CPU 工作；不得宣称 GPU Spike 或完整产品已通过验收。
 
-接手先读 HANDOFF.md → 需求重整.md R3 → 用户 SystemOneStudio_判断模型技术方案_v3.md → 技术方案.md T3 → 开发计划.md P3。SystemOneStudio-demo-v3.html 是视觉基准，里面的数字、训练动画、预设项目和服务状态均为演示。
+接手先读 HANDOFF.md → 需求重整.md R4 → 用户 SystemOneStudio_判断模型技术方案_v3.md → 技术方案.md T4 → 开发计划.md P4。SystemOneStudio-demo-v3.html 是视觉基准，里面的数字、训练动画、预设项目和服务状态均为演示。
 
 冲突优先级：用户最新指示 > 用户 V3 技术方案 > 已批准 P3 的实施取舍 > Demo 视觉交互 > 原需求未被替代的约束。归档原需求在 docs/archive/2026-10-06/root-cleanup/需求方案.txt。历史方案、审计与旧测试不能覆盖当前基线。
 
@@ -27,6 +27,8 @@
 - 未测量、缺类、零分母、失败均显式区分；不返回 0/1 冒充实测，不用动画登记成功。
 - 不承诺硬件无关 P95、训练时长或显存。所有外显量值来自 API/测量，估算需来源与未测量说明。
 - P0 不做业务模板、助手、自定义 Head、ModernBERT、RLCD-like、DPO、教师合成、分机代理、多租户/市场、分布式或 ONNX/MNN。JEV L2/L3 不作为首版前置，也不得未经证据声明兼容。
+- 系统配置允许登记多个 OpenAI-compatible 教师连接/模型，但 P0 只做 CRUD 与无样本探测；教师生成仍是 P1，每次实际调用须显式选择并标注数据外发。不得复用旧 AssistantSettings 作为教师业务配置。
+- 基模型允许多个 artifact 留存，recipe 每次只绑定一个精确 revision；下载/登记不等于训练兼容，未通过适配验证的模型不能进入可执行选择器。P0 支持固定 revision 仓库来源和容器可见的本地目录；拒绝任意加载 kwargs，trust_remote_code 默认关闭。
 
 ## 3. 当前代码事实（2026-10-06）
 
@@ -78,6 +80,6 @@ API 默认 9969，Vite 5174。npm run up 是 CPU 实验入口，不能说已运�
 
 ## 6. 下一工作与交付证据
 
-按 P3：W1 真实 GPU CLI Spike 首先证明 tokenizer/slot/LoRA/CE+Brier/merge/cal/policy/test；无 GPU 可继续 W2 数据版本、迁移与校准算法的独立 CPU 部分。不要先接上完整训练 UI、展示假结果，再补算法。
+按 P4：W1 真实 GPU CLI Spike 首先证明 tokenizer/slot/LoRA/CE+Brier/merge/cal/policy/test；无 GPU 可继续 W2 数据版本、迁移、系统配置和校准算法的独立 CPU 部分。A11/A12 属教师资源 CRUD 与基模型目录/下载管理，不表示教师生成或GPU训练已验收。
 
 每个工作包交付时更新 HANDOFF.md、实施记录、实际验证命令与未完成项。交付必须明确“代码存在”“CPU 逻辑通过”“真实 GPU 通过”“业务效果通过”四个层次，不能混写。历史归档用于追溯，不作为最新状态。
